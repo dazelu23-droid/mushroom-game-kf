@@ -1,0 +1,99 @@
+[gd_scene format=3 uid="uid://db8uxf723w22w"]
+
+[ext_resource type="Script" path="res://scripts/ui/species_select.gd" id="1_script"]
+
+[node name="SpeciesSelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.12, 0.16, 0.11, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="HBox" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="LeftPanel" type="VBoxContainer" parent="Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Margin/HBox/LeftPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Mushroom Life Cycle"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="Margin/HBox/LeftPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.82, 0.65, 1)
+text = "Each species is matched to its real 3D model texture from the asset pack"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="SpeciesList" type="ItemList" parent="Margin/HBox/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StartButton" type="Button" parent="Margin/HBox/LeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Begin as Spore"
+
+[node name="RightPanel" type="VBoxContainer" parent="Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="PreviewImage" type="TextureRect" parent="Margin/HBox/RightPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 280)
+layout_mode = 2
+size_flags_horizontal = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NameLabel" type="Label" parent="Margin/HBox/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+
+[node name="ScientificLabel" type="Label" parent="Margin/HBox/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.75, 0.6, 1)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+
+[node name="DetailLabel" type="RichTextLabel" parent="Margin/HBox/RightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = false
+scroll_active = true

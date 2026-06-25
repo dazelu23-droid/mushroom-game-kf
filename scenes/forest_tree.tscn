@@ -1,0 +1,66 @@
+[gd_scene format=3 uid="uid://btdi7rwis65aa"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
+top_radius = 0.14
+bottom_radius = 0.38
+height = 5.8
+radial_segments = 16
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark"]
+albedo_color = Color(0.24, 0.17, 0.11, 1)
+roughness = 0.94
+
+[sub_resource type="SphereMesh" id="SphereMesh_foliage"]
+radius = 1.8
+height = 3.2
+radial_segments = 12
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaves"]
+albedo_color = Color(0.08, 0.32, 0.1, 1)
+roughness = 0.82
+emission_enabled = true
+emission = Color(0.03, 0.08, 0.02, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_branch"]
+top_radius = 0.04
+bottom_radius = 0.08
+height = 1.6
+radial_segments = 6
+
+[node name="ForestTree" type="Node3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.9, 0)
+mesh = SubResource("CylinderMesh_trunk")
+surface_material_override/0 = SubResource("StandardMaterial3D_bark")
+
+[node name="BranchA" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0.35, 4.2, 0.1)
+mesh = SubResource("CylinderMesh_branch")
+surface_material_override/0 = SubResource("StandardMaterial3D_bark")
+
+[node name="BranchB" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.866025, 0.433013, -0.25, 0, 0.5, 0.866025, 0.5, -0.75, -0.433013, -0.3, 4.8, -0.15)
+mesh = SubResource("CylinderMesh_branch")
+surface_material_override/0 = SubResource("StandardMaterial3D_bark")
+
+[node name="FoliageLower" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.45, 0, 0, 0, 0.85, 0, 0, 0, 1.45, 0, 5.1, 0)
+mesh = SubResource("SphereMesh_foliage")
+surface_material_override/0 = SubResource("StandardMaterial3D_leaves")
+
+[node name="FoliageMid" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.2, 0, 0, 0, 0.8, 0, 0, 0, 1.2, 0, 6.4, 0)
+mesh = SubResource("SphereMesh_foliage")
+surface_material_override/0 = SubResource("StandardMaterial3D_leaves")
+
+[node name="FoliageUpper" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.95, 0, 0, 0, 0.75, 0, 0, 0, 0.95, 0, 7.5, 0)
+mesh = SubResource("SphereMesh_foliage")
+surface_material_override/0 = SubResource("StandardMaterial3D_leaves")
+
+[node name="FoliageTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.6, 0, 0, 0, 0.65, 0, 0, 0, 0.6, 0, 8.3, 0)
+mesh = SubResource("SphereMesh_foliage")
+surface_material_override/0 = SubResource("StandardMaterial3D_leaves")
