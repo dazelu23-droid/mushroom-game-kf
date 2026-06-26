@@ -42,7 +42,6 @@ sdfgi_enabled = true
 sdfgi_use_occlusion = true
 glow_enabled = true
 glow_intensity = 0.42
-glow_bloom = 0.12
 fog_enabled = true
 fog_light_color = Color(0.58, 0.68, 0.52, 1)
 fog_density = 0.012

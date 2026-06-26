@@ -58,8 +58,8 @@ func _setup_visuals() -> void:
 	_germ_hypha_material.albedo_color = Color(0.95, 0.92, 0.84, 0.92)
 	_germ_hypha_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_germ_hypha_material.roughness = 0.32
-	_germ_hypha_material.subsurface_scattering_enabled = true
-	_germ_hypha_material.subsurface_scattering_strength = 0.5
+	_germ_hypha_material.subsurf_scatter_enabled = true
+	_germ_hypha_material.subsurf_scatter_strength = 0.5
 	_germ_hypha_material.clearcoat_enabled = true
 	_germ_hypha_material.clearcoat = 0.18
 
@@ -77,7 +77,7 @@ func _get_camera_input_direction() -> Vector3:
 	if Input.is_action_pressed("move_right"):
 		input_dir += right
 	if Input.is_action_pressed("move_left"):
-		input_dir -= left
+		input_dir -= right
 	return input_dir
 
 
@@ -318,8 +318,8 @@ func _reset_spore_material() -> void:
 	mat.emission = Color(1.0, 0.95, 0.55)
 	mat.emission_energy_multiplier = 1.5
 	mat.roughness = 0.3
-	mat.subsurface_scattering_enabled = true
-	mat.subsurface_scattering_strength = 0.35
+	mat.subsurf_scatter_enabled = true
+	mat.subsurf_scatter_strength = 0.35
 	_mesh.set_surface_override_material(0, mat)
 
 

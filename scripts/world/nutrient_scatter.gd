@@ -63,11 +63,11 @@ func _create_source(world_pos: Vector3, def: Dictionary) -> void:
 	mat.roughness = 0.82
 	mat.metallic = 0.0
 	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	mat.subsurface_scattering_enabled = true
-	mat.subsurface_scattering_strength = 0.25
-	mat.transmittance_enabled = true
-	mat.transmittance_color = Color(0.55, 0.38, 0.22)
-	mat.transmittance_depth = 0.15
+	mat.subsurf_scatter_enabled = true
+	mat.subsurf_scatter_strength = 0.25
+	mat.subsurf_scatter_transmittance_enabled = true
+	mat.subsurf_scatter_transmittance_color = Color(0.55, 0.38, 0.22)
+	mat.subsurf_scatter_transmittance_depth = 0.15
 	mesh_inst.material_override = mat
 	root.add_child(mesh_inst)
 

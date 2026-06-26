@@ -89,11 +89,11 @@ func _build_materials() -> void:
 	_hypha_material.roughness = 0.28
 	_hypha_material.metallic = 0.0
 	_hypha_material.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
-	_hypha_material.subsurface_scattering_enabled = true
-	_hypha_material.subsurface_scattering_strength = 0.55
-	_hypha_material.transmittance_enabled = true
-	_hypha_material.transmittance_color = Color(0.98, 0.9, 0.78)
-	_hypha_material.transmittance_depth = 0.08
+	_hypha_material.subsurf_scatter_enabled = true
+	_hypha_material.subsurf_scatter_strength = 0.55
+	_hypha_material.subsurf_scatter_transmittance_enabled = true
+	_hypha_material.subsurf_scatter_transmittance_color = Color(0.98, 0.9, 0.78)
+	_hypha_material.subsurf_scatter_transmittance_depth = 0.08
 	_hypha_material.clearcoat_enabled = true
 	_hypha_material.clearcoat = 0.22
 	_hypha_material.clearcoat_roughness = 0.18
