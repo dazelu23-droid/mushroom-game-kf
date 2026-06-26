@@ -53,6 +53,13 @@ func scatter(terrain_height: Callable = Callable()) -> void:
 		placed += 1
 
 
+func get_substrate_patch_positions() -> Array[Vector3]:
+	var positions: Array[Vector3] = []
+	for child in get_children():
+		positions.append(child.global_position)
+	return positions
+
+
 func _is_valid_position(pos: Vector2) -> bool:
 	if pos.length() < center_clear_radius:
 		return false
@@ -91,17 +98,20 @@ func _create_patch(world_pos: Vector3, def: Dictionary) -> void:
 			mesh_inst.rotation.z = PI * 0.5
 			mesh_inst.rotation.y = _rng.randf_range(0.0, TAU)
 		"mound":
-			var sph := SphereMesh.new()
-			sph.radius = _rng.randf_range(1.1, 1.5)
-			sph.height = sph.radius * 0.5
-			mesh_inst.mesh = sph
-			mesh_inst.position.y = sph.radius * 0.25
+			var mound := CylinderMesh.new()
+			mound.top_radius = _rng.randf_range(1.1, 1.35)
+			mound.bottom_radius = mound.top_radius * 1.08
+			mound.height = 0.22
+			mound.radial_segments = 16
+			mesh_inst.mesh = mound
+			mesh_inst.position.y = 0.08
 		_:
 			var plane := PlaneMesh.new()
 			plane.size = Vector2(PATCH_SCENE_SIZE, PATCH_SCENE_SIZE)
-			plane.subdivide_width = 2
-			plane.subdivide_depth = 2
+			plane.subdivide_width = 3
+			plane.subdivide_depth = 3
 			mesh_inst.mesh = plane
+			mesh_inst.position.y = 0.02
 	root.add_child(mesh_inst)
 
 	var area := Area3D.new()

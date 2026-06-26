@@ -60,7 +60,7 @@ func _on_landing_ready_changed(can_land: bool, over_compatible: bool) -> void:
 	elif can_land:
 		land_button.text = "Land (wrong substrate)"
 	else:
-		land_button.text = "Land — drift over green patch"
+		land_button.text = "Land — drift over ring-marked patch"
 
 
 func _on_land_pressed() -> void:

@@ -383,7 +383,7 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 18
 disabled = true
-text = "Land — drift over green patch"
+text = "Land — drift over ring-marked patch"
 
 [node name="GrowHyphaeButton" type="Button" parent="UI/HUD"]
 unique_name_in_owner = true

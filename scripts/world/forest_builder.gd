@@ -34,6 +34,23 @@ func get_terrain_height(x: float, z: float) -> float:
 	return _terrain_height(x, z)
 
 
+func clear_vegetation_near_points(points: Array[Vector3], radius: float) -> void:
+	for group_name in ["Understory", "Ferns"]:
+		var group := get_node_or_null(group_name) as Node3D
+		if group == null:
+			continue
+		for child in group.get_children():
+			if not child is Node3D:
+				continue
+			var node := child as Node3D
+			var node_pos := Vector2(node.global_position.x, node.global_position.z)
+			for point in points:
+				var patch_pos := Vector2(point.x, point.z)
+				if node_pos.distance_to(patch_pos) < radius:
+					node.queue_free()
+					break
+
+
 func _terrain_height(x: float, z: float) -> float:
 	return _height_noise.get_noise_2d(x, z) * 1.4
 

@@ -33,6 +33,9 @@ func _ready() -> void:
 	if nutrient_scatter:
 		nutrient_scatter.scatter_near_substrates(substrates)
 
+	if forest and scatter:
+		forest.clear_vegetation_near_points(scatter.get_substrate_patch_positions(), 4.5)
+
 	_collect_nutrients()
 	_highlight_compatible_substrates()
 	_connect_signals()
@@ -41,14 +44,14 @@ func _ready() -> void:
 	GameState.set_phase(LifeCycle.Phase.SPORE_DISPERSAL)
 	spore.activate()
 	hud.show_objective(
-		"Drift over the forest with WASD. Green patches are compatible substrates — press Land when overhead."
+		"Drift over the forest with WASD. Ring-marked soil patches are compatible substrates — press Land when overhead."
 	)
 
 
 func _collect_nutrients() -> void:
 	_nutrient_sources.clear()
 	for node in nutrients.find_children("*", "Area3D", true, false):
-		if node is NutrientSource:
+		if node is NutrientSource:                  
 			_nutrient_sources.append(node as NutrientSource)
 
 
@@ -79,11 +82,20 @@ func _process(delta: float) -> void:
 func _on_spore_landed(_pos: Vector3, substrate_type: String) -> void:
 	var compatible: bool = MushroomSpeciesData.has_substrate(GameState.selected_species, substrate_type)
 	if not compatible:
-		hud.show_objective("Wrong substrate! Drift to a green highlighted patch and press Land again.")
+		hud.show_objective("Wrong substrate! Drift to a ring-marked patch and press Land again.")
 		return
 	hud.set_landing_ui_visible(false)
 	GameState.set_phase(LifeCycle.Phase.GERMINATION)
-	hud.show_objective("Germinating… Hypha emerging from spore. Compatible mating hyphae will fuse (plasmogamy).")
+	var spore_cam := get_node_or_null("SporeCamera") as OrbitCamera
+	if spore_cam:
+		spore_cam.set_follow_enabled(false)
+		spore_cam.current = false
+	if world_camera:
+		world_camera.set_focus_point(spore.global_position)
+		world_camera.follow_distance = 5.5
+		world_camera.set_follow_enabled(true)
+		world_camera.current = true
+	hud.show_objective("Germinating… Watch the spore swell and send out its first hypha.")
 
 
 func _on_germination_complete() -> void:
@@ -96,6 +108,7 @@ func _on_germination_complete() -> void:
 		spore_cam.current = false
 	if world_camera:
 		world_camera.set_focus_point(GameState.landing_position)
+		world_camera.follow_distance = 12.0
 		world_camera.set_follow_enabled(true)
 	world_camera.current = true
 	hud.bind_mycelium(mycelium)
