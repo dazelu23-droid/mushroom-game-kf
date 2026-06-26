@@ -1,6 +1,28 @@
-[gd_scene format=3 uid="uid://db8uxf723w22w"]
+[gd_scene load_steps=6 format=3 uid="uid://db8uxf723w22w"]
 
 [ext_resource type="Script" path="res://scripts/ui/species_select.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/ui/species_model_preview.gd" id="2_preview"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_preview"]
+sky_top_color = Color(0.14, 0.22, 0.16, 1)
+sky_horizon_color = Color(0.22, 0.3, 0.2, 1)
+ground_bottom_color = Color(0.1, 0.12, 0.08, 1)
+ground_horizon_color = Color(0.16, 0.2, 0.12, 1)
+
+[sub_resource type="Sky" id="Sky_preview"]
+sky_material = SubResource("ProceduralSkyMaterial_preview")
+
+[sub_resource type="Environment" id="Environment_preview"]
+background_mode = 2
+sky = SubResource("Sky_preview")
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.62, 0.5, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+tonemap_exposure = 1.05
+ssao_enabled = true
+glow_enabled = true
+glow_intensity = 0.25
 
 [node name="SpeciesSelect" type="Control"]
 layout_mode = 3
@@ -50,7 +72,7 @@ horizontal_alignment = 1
 [node name="Subtitle" type="Label" parent="Margin/HBox/LeftPanel"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.82, 0.65, 1)
-text = "Each species is matched to its real 3D model texture from the asset pack"
+text = "Select a species — preview shows the real 3D fruiting body model"
 horizontal_alignment = 1
 autowrap_mode = 2
 
@@ -69,13 +91,53 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="PreviewImage" type="TextureRect" parent="Margin/HBox/RightPanel"]
+[node name="PreviewViewport" type="SubViewportContainer" parent="Margin/HBox/RightPanel"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(280, 280)
+custom_minimum_size = Vector2(320, 320)
 layout_mode = 2
 size_flags_horizontal = 4
-expand_mode = 1
-stretch_mode = 5
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="Margin/HBox/RightPanel/PreviewViewport"]
+own_world_3d = true
+transparent_bg = false
+handle_input_locally = true
+size = Vector2i(480, 480)
+render_target_update_mode = 4
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport"]
+environment = SubResource("Environment_preview")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport"]
+transform = Transform3D(0.819152, -0.469846, 0.32899, 0, 0.573576, 0.819152, -0.573576, -0.67101, 0.469846, 0, 4, 0)
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.3
+shadow_enabled = true
+
+[node name="FillLight" type="DirectionalLight3D" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport"]
+transform = Transform3D(0.939693, 0.17101, -0.296198, 0, 0.866025, 0.5, 0.34202, -0.469846, 0.813798, 0, 2, 0)
+light_color = Color(0.6, 0.72, 0.85, 1)
+light_energy = 0.35
+
+[node name="Ground" type="MeshInstance3D" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.01, 0)
+
+[node name="SpeciesPreview" type="Node3D" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport"]
+unique_name_in_owner = true
+script = ExtResource("2_preview")
+
+[node name="ModelSlot" type="Node3D" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport/SpeciesPreview"]
+
+[node name="Camera3D" type="Camera3D" parent="Margin/HBox/RightPanel/PreviewViewport/SubViewport/SpeciesPreview"]
+transform = Transform3D(1, 0, 0, 0, 0.965926, 0.258819, 0, -0.258819, 0.965926, 0, 1.1, 3.4)
+fov = 42.0
+
+[node name="PreviewHint" type="Label" parent="Margin/HBox/RightPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.72, 0.58, 1)
+theme_override_font_sizes/font_size = 13
+text = "Drag to rotate the 3D model"
+horizontal_alignment = 1
 
 [node name="NameLabel" type="Label" parent="Margin/HBox/RightPanel"]
 unique_name_in_owner = true

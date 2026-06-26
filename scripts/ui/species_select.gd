@@ -3,13 +3,15 @@ extends Control
 const GAME_SCENE := preload("res://scenes/game_world.tscn")
 
 @onready var species_list: ItemList = %SpeciesList
-@onready var preview_image: TextureRect = %PreviewImage
+@onready var preview_container: SubViewportContainer = %PreviewViewport
+@onready var model_preview = %SpeciesPreview as Node3D
 @onready var name_label: Label = %NameLabel
 @onready var scientific_label: Label = %ScientificLabel
 @onready var detail_label: RichTextLabel = %DetailLabel
 @onready var start_button: Button = %StartButton
 
 var _selected_index: int = 0
+var _dragging_preview := false
 
 
 func _ready() -> void:
@@ -17,6 +19,19 @@ func _ready() -> void:
 	species_list.item_selected.connect(_on_species_selected)
 	start_button.pressed.connect(_on_start_pressed)
 	_on_species_selected(0)
+
+
+func _input(event: InputEvent) -> void:
+	if not preview_container.get_global_rect().has_point(get_viewport().get_mouse_position()):
+		if event is InputEventMouseButton:
+			_dragging_preview = false
+		return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			_dragging_preview = mb.pressed
+	elif event is InputEventMouseMotion and _dragging_preview:
+		model_preview.apply_drag((event as InputEventMouseMotion).relative)
 
 
 func _populate_species() -> void:
@@ -29,13 +44,10 @@ func _populate_species() -> void:
 
 func _on_species_selected(index: int) -> void:
 	_selected_index = index
-	var species: Dictionary = MushroomSpeciesData.SPECIES[index].duplicate()
-	species["preview_texture"] = MushroomSpeciesData.preview_for_mesh(species.get("mesh_name", ""))
+	var species: Dictionary = MushroomSpeciesData.SPECIES[index]
 	name_label.text = species.get("common_name", "")
 	scientific_label.text = species.get("scientific_name", "")
-	var tex_path: String = species.get("preview_texture", "")
-	if tex_path != "":
-		preview_image.texture = load(tex_path)
+	model_preview.show_mesh(String(species.get("mesh_name", "mushroom_01")))
 
 	var substrate_list: Array = species.get("substrates", [])
 	var enzyme_list: Array = species.get("enzymes", [])
@@ -64,7 +76,6 @@ func _on_species_selected(index: int) -> void:
 
 func _on_start_pressed() -> void:
 	var species: Dictionary = MushroomSpeciesData.SPECIES[_selected_index].duplicate()
-	species["preview_texture"] = MushroomSpeciesData.preview_for_mesh(species.get("mesh_name", ""))
 	GameState.select_species(species)
 	get_tree().change_scene_to_packed(GAME_SCENE)
 
