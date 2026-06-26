@@ -2,6 +2,7 @@ class_name ForestBuilder
 extends Node3D
 
 const TREE_SCENE := preload("res://scenes/forest_tree.tscn")
+const TREE_SPORE_FADE_SCRIPT := preload("res://scripts/world/tree_spore_fade.gd")
 
 @export var forest_radius: float = 30.0
 @export var tree_count: int = 95
@@ -21,6 +22,16 @@ func build() -> void:
 	_build_understory()
 	_build_ferns()
 	_build_atmosphere_particles()
+	_setup_tree_spore_fade()
+
+
+func _setup_tree_spore_fade() -> void:
+	if get_node_or_null("TreeSporeFade"):
+		return
+	var fader := Node.new()
+	fader.name = "TreeSporeFade"
+	fader.set_script(TREE_SPORE_FADE_SCRIPT)
+	add_child(fader)
 
 
 func _setup_height_noise() -> void:
@@ -370,6 +381,7 @@ func _apply_tree_materials(tree: Node3D) -> void:
 				mat.emission = mat.albedo_color * 0.12
 				mesh_inst.material_override = mat
 			else:
-				mesh_inst.material_override = bark
+				var bark_copy := bark.duplicate() as StandardMaterial3D
+				mesh_inst.material_override = bark_copy
 				mesh_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 

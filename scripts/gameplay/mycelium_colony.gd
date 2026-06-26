@@ -2,25 +2,25 @@ class_name MyceliumColony
 extends Node3D
 
 ## Dikaryotic mycelium with apical tip growth, chemotaxis, and enzyme-gated nutrient uptake.
-## Hyphae are scaled up from real ~1–10 µm diameter for visibility.
 
 signal colonization_ready
 signal grow_state_changed(is_growing: bool)
 
 class HyphaTip:
 	var position: Vector3 = Vector3.ZERO
-	var direction: Vector3 = Vector3(0.0, -0.15, 1.0).normalized()
+	var direction: Vector3 = Vector3(0.0, -0.05, 1.0).normalized()
 	var depth: int = 0
 	var energy: float = 1.0
+	var age: float = 0.0
 
 
-@export var growth_speed: float = 3.8
-@export var max_branches: int = 160
-@export var tip_search_range: float = 14.0
-@export var absorb_range: float = 3.0
-@export var branch_chance: float = 0.14
-@export var chemotaxis_strength: float = 0.72
-@export var tortuosity: float = 0.35
+@export var growth_speed: float = 6.2
+@export var max_branches: int = 180
+@export var tip_search_range: float = 16.0
+@export var absorb_range: float = 3.2
+@export var branch_chance: float = 0.09
+@export var chemotaxis_strength: float = 0.78
+@export var tortuosity: float = 0.22
 
 var _tips: Array[HyphaTip] = []
 var _nutrient_sources: Array[NutrientSource] = []
@@ -110,10 +110,10 @@ func _build_materials() -> void:
 func _create_initial_hypha() -> void:
 	var tip := HyphaTip.new()
 	tip.position = Vector3.ZERO
-	tip.direction = Vector3(0.0, -0.2, 0.85).normalized()
+	tip.direction = Vector3(0.0, -0.08, 1.0).normalized()
 	tip.depth = 0
 	_tips.append(tip)
-	_add_hypha_segment(Vector3.ZERO, Vector3(0.0, -0.01, 0.12), 0)
+	_add_hypha_segment(Vector3.ZERO, Vector3(0.0, -0.008, 0.1), 0, tip.direction)
 
 
 func _physics_process(delta: float) -> void:
@@ -145,6 +145,7 @@ func _grow_step(delta: float) -> void:
 	var temp_factor := _temperature_growth_factor(temp_c, colon_temp)
 
 	for tip in _tips:
+		tip.age += delta
 		var nutrient := _find_nearest_nutrient_for_tip(tip)
 		if nutrient == null:
 			_explore_step(tip, delta, temp_factor, new_tips)
@@ -154,51 +155,57 @@ func _grow_step(delta: float) -> void:
 		var to_target := target - tip.position
 		var dist := to_target.length()
 		if dist < 0.02:
+			new_tips.append(tip)
 			continue
 
-		var desired_dir := to_target.normalized()
-		desired_dir.y = clampf(desired_dir.y, -0.18, 0.06)
-		tip.direction = tip.direction.lerp(desired_dir, chemotaxis_strength * delta * 4.5).normalized()
+		var desired_dir := _substrate_direction(to_target.normalized())
+		tip.direction = tip.direction.lerp(desired_dir, chemotaxis_strength * delta * 5.0).normalized()
 		tip.direction = tip.direction.rotated(
 			Vector3.UP,
-			_rng.randf_range(-tortuosity, tortuosity) * delta * 6.0
-		).normalized()
+			_rng.randf_range(-tortuosity, tortuosity) * delta * 4.0
+		)
+		tip.direction = _substrate_direction(tip.direction)
 
 		var efficiency := MushroomSpeciesData.digest_efficiency(
 			_species, nutrient.get_nutrient_type()
 		)
-		var speed_boost := 1.0 + efficiency * 0.35
+		var speed_boost := 1.0 + efficiency * 0.4
 		if dist < absorb_range:
-			speed_boost += 0.4
+			speed_boost += 0.55
 
-		var length := growth_speed * temp_factor * speed_boost * delta * _rng.randf_range(0.55, 1.0)
-		var end := tip.position + tip.direction * length
-		_add_hypha_segment(tip.position, end, tip.depth)
+		var length := growth_speed * temp_factor * speed_boost * delta * _rng.randf_range(0.7, 1.0)
+		var start := tip.position
+		var end := start + tip.direction * length
+		tip.direction = (end - start).normalized()
+		_add_hypha_segment(start, end, tip.depth, tip.direction)
 		tip.position = end
 		tip.depth += 1
 		new_tips.append(tip)
 
-		if tip.depth > 2 and _rng.randf() < branch_chance and _branch_count < max_branches - 1:
+		var near_food := dist <= absorb_range * 1.4
+		if tip.depth > 3 and near_food and _rng.randf() < branch_chance and _branch_count < max_branches - 1:
 			var branch := HyphaTip.new()
 			branch.position = tip.position
-			var branch_angle := _rng.randf_range(0.45, 1.1) * (1.0 if _rng.randf() > 0.5 else -1.0)
-			branch.direction = tip.direction.rotated(Vector3.UP, branch_angle).normalized()
-			branch.direction.y = clampf(branch.direction.y, -0.12, 0.04)
+			branch.direction = _substrate_direction(
+				tip.direction.rotated(Vector3.UP, _rng.randf_range(0.35, 0.75) * (1.0 if _rng.randf() > 0.5 else -1.0))
+			)
 			branch.depth = tip.depth
-			branch.energy = tip.energy * 0.7
-			var branch_end := branch.position + branch.direction * length * 0.65
-			_add_hypha_segment(branch.position, branch_end, branch.depth)
+			branch.energy = tip.energy * 0.65
+			var branch_start := branch.position
+			var branch_end := branch_start + branch.direction * length * 0.55
+			branch.direction = (branch_end - branch_start).normalized()
+			_add_hypha_segment(branch_start, branch_end, branch.depth, branch.direction)
 			branch.position = branch_end
 			branch.depth += 1
 			new_tips.append(branch)
 
 		if dist <= absorb_range:
-			var absorb_rate := 2.8 * efficiency * delta * speed_boost
+			var absorb_rate := 4.2 * efficiency * delta * speed_boost
 			var absorbed: float = nutrient.absorb(absorb_rate)
 			if absorbed > 0.0:
 				GameState.add_nutrients(absorbed)
 				GameState.set_colonization(
-					GameState.colonization_percent + absorbed * 0.18 * efficiency
+					GameState.colonization_percent + absorbed * 0.24 * efficiency
 				)
 				nutrient.pulse_absorption(absorbed)
 
@@ -210,15 +217,29 @@ func _grow_step(delta: float) -> void:
 func _explore_step(tip: HyphaTip, delta: float, temp_factor: float, new_tips: Array[HyphaTip]) -> void:
 	tip.direction = tip.direction.rotated(
 		Vector3.UP,
-		_rng.randf_range(-0.8, 0.8) * delta * 2.5
-	).normalized()
-	tip.direction.y = clampf(tip.direction.y, -0.2, 0.02)
-	var length := growth_speed * temp_factor * 0.35 * delta
-	var end := tip.position + tip.direction * length
-	_add_hypha_segment(tip.position, end, tip.depth)
+		_rng.randf_range(-0.45, 0.45) * delta * 3.0
+	)
+	tip.direction = _substrate_direction(tip.direction)
+	var length := growth_speed * temp_factor * 0.5 * delta
+	var start := tip.position
+	var end := start + tip.direction * length
+	tip.direction = (end - start).normalized()
+	_add_hypha_segment(start, end, tip.depth, tip.direction)
 	tip.position = end
 	tip.depth += 1
 	new_tips.append(tip)
+
+
+func _substrate_direction(dir: Vector3) -> Vector3:
+	if dir.length_squared() < 0.0001:
+		return Vector3(0.0, -0.05, 1.0)
+	dir = dir.normalized()
+	dir.y = clampf(dir.y, -0.1, 0.03)
+	var horizontal := Vector3(dir.x, 0.0, dir.z)
+	if horizontal.length_squared() < 0.0001:
+		horizontal = Vector3(0.0, 0.0, 1.0)
+	horizontal = horizontal.normalized()
+	return (horizontal * 0.94 + Vector3(0.0, dir.y, 0.0)).normalized()
 
 
 func _temperature_growth_factor(temp_c: float, optimal: Vector2) -> float:
@@ -248,14 +269,14 @@ func _find_nearest_nutrient_for_tip(tip: HyphaTip) -> NutrientSource:
 	return best
 
 
-func _add_hypha_segment(start: Vector3, end: Vector3, depth: int) -> void:
+func _add_hypha_segment(start: Vector3, end: Vector3, depth: int, growth_dir: Vector3) -> void:
 	var segment_length := start.distance_to(end)
-	if segment_length < 0.008:
+	if segment_length < 0.006:
 		return
 
-	var depth_t := clampf(1.0 - float(depth) / 28.0, 0.3, 1.0)
-	var bottom_r := lerpf(0.005, 0.024, depth_t) * _rng.randf_range(0.92, 1.05)
-	var top_r := bottom_r * _rng.randf_range(0.72, 0.88)
+	var depth_t := clampf(1.0 - float(depth) / 32.0, 0.28, 1.0)
+	var bottom_r := lerpf(0.004, 0.022, depth_t) * _rng.randf_range(0.94, 1.04)
+	var top_r := bottom_r * _rng.randf_range(0.75, 0.9)
 
 	var mesh_instance := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
@@ -275,8 +296,12 @@ func _add_hypha_segment(start: Vector3, end: Vector3, depth: int) -> void:
 
 	var mid := (start + end) * 0.5
 	mesh_instance.position = mid
-	mesh_instance.look_at(end, Vector3.UP)
-	mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	if growth_dir.length_squared() > 0.0001:
+		var up := Vector3.UP
+		if absf(growth_dir.dot(up)) > 0.98:
+			up = Vector3.RIGHT
+		mesh_instance.look_at(mid + growth_dir, up)
+		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
 
 	_hypha_root.add_child(mesh_instance)
 	_branch_count += 1
@@ -289,8 +314,8 @@ func _update_tip_glows(show: bool) -> void:
 	for tip in _tips:
 		var glow := MeshInstance3D.new()
 		var sphere := SphereMesh.new()
-		sphere.radius = 0.018
-		sphere.height = 0.036
+		sphere.radius = 0.016
+		sphere.height = 0.032
 		sphere.radial_segments = 8
 		sphere.rings = 4
 		glow.mesh = sphere

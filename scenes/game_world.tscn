@@ -238,8 +238,8 @@ fov = 60.0
 unique_name_in_owner = true
 visible = false
 script = ExtResource("3_mycelium")
-growth_speed = 3.8
-max_branches = 160
+growth_speed = 6.2
+max_branches = 180
 
 [node name="MushroomGrowth" type="Node3D" parent="."]
 unique_name_in_owner = true
