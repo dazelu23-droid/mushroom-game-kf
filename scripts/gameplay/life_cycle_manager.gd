@@ -98,7 +98,12 @@ func _on_germination_complete() -> void:
 		world_camera.set_focus_point(GameState.landing_position)
 		world_camera.set_follow_enabled(true)
 	world_camera.current = true
-	hud.show_objective("Hold SPACE near dead matter to extend hyphae and secrete digestive enzymes. Colonize to 80%.")
+	hud.bind_mycelium(mycelium)
+	hud.set_grow_ui_visible(true)
+	hud.show_objective(
+		"Hold SPACE or press Grow Hyphae to extend apical tips toward dead matter. "
+		+ "Species enzymes digest lignin/cellulose — colonize to 80%."
+	)
 
 
 func _on_colonization_ready() -> void:
@@ -133,6 +138,7 @@ func _begin_fruiting() -> void:
 	if _fruiting_started:
 		return
 	_fruiting_started = true
+	hud.set_grow_ui_visible(false)
 	mycelium.deactivate()
 	GameState.set_phase(LifeCycle.Phase.PRIMORDIUM_FORMATION)
 	await get_tree().create_timer(1.5).timeout

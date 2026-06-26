@@ -59,8 +59,15 @@ func _create_source(world_pos: Vector3, def: Dictionary) -> void:
 	mesh_inst.mesh = plane
 	mesh_inst.position.y = 0.08
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.28, 0.22, 0.16)
-	mat.roughness = 0.96
+	mat.albedo_color = Color(0.34, 0.26, 0.17)
+	mat.roughness = 0.82
+	mat.metallic = 0.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	mat.subsurface_scattering_enabled = true
+	mat.subsurface_scattering_strength = 0.25
+	mat.transmittance_enabled = true
+	mat.transmittance_color = Color(0.55, 0.38, 0.22)
+	mat.transmittance_depth = 0.15
 	mesh_inst.material_override = mat
 	root.add_child(mesh_inst)
 

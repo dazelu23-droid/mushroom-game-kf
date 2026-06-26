@@ -327,6 +327,34 @@ static func has_substrate(species: Dictionary, substrate_type: String) -> bool:
 	return substrate_type in get_substrates(species)
 
 
+const NUTRIENT_ENZYME_MAP: Dictionary = {
+	"cellulose": ["cellulase"],
+	"hemicellulose": ["cellulase"],
+	"lignin": ["lignin peroxidase", "laccase"],
+	"lignocellulose": ["cellulase", "lignin peroxidase", "laccase"],
+}
+
+
+static func can_digest_nutrient(species: Dictionary, nutrient_type: String) -> bool:
+	return digest_efficiency(species, nutrient_type) >= 0.5
+
+
+static func digest_efficiency(species: Dictionary, nutrient_type: String) -> float:
+	var enzymes: Array = species.get("enzymes", [])
+	var required: Array = NUTRIENT_ENZYME_MAP.get(nutrient_type, [])
+	if required.is_empty():
+		return 0.25
+	var matches := 0
+	for req in required:
+		for enzyme in enzymes:
+			if str(req).to_lower() in str(enzyme).to_lower():
+				matches += 1
+				break
+	if matches == 0:
+		return 0.18
+	return clampf(0.55 + float(matches) * 0.22, 0.0, 1.0)
+
+
 static func get_by_id(species_id: String) -> Dictionary:
 	for species in SPECIES:
 		if species.get("id", "") == species_id:
