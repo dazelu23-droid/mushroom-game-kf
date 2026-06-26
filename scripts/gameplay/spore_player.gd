@@ -31,6 +31,7 @@ var _germ_root: Node3D
 var _germ_hypha_material: StandardMaterial3D
 var _germ_segment_count := 0
 var _main_germ_tip := Vector3.ZERO
+var _main_germ_radius := 0.022
 
 
 func _ready() -> void:
@@ -220,34 +221,63 @@ func _add_germ_segment(index: int) -> void:
 
 	var length := lerpf(0.07, 0.16, float(index) / 14.0)
 	var end := start + direction * length
-	_add_hypha_mesh(start, end, lerpf(0.022, 0.01, float(index) / 14.0))
+	var segment_radius := lerpf(0.022, 0.01, float(index) / 14.0) if index == 0 else _main_germ_radius
+	_main_germ_radius = _add_hypha_mesh(start, end, segment_radius, index > 0)
 	_main_germ_tip = end
 
 	if index == 4 or index == 8:
+		_add_hypha_junction(start, segment_radius)
 		var branch_dir := direction.rotated(Vector3.UP, rng.randf_range(-1.1, 1.1))
 		branch_dir.y = clampf(branch_dir.y, -0.9, -0.25)
 		var branch_end := start + branch_dir * length * 0.72
-		_add_hypha_mesh(start, branch_end, 0.011)
+		_add_hypha_mesh(start, branch_end, segment_radius, true)
 
 
-func _add_hypha_mesh(start: Vector3, end: Vector3, radius: float) -> void:
+func _add_hypha_mesh(start: Vector3, end: Vector3, start_radius: float, overlap_start: bool = true) -> float:
+	var dir := (end - start).normalized()
+	if overlap_start and start_radius > 0.0 and dir.length_squared() > 0.0001:
+		start = start - dir * start_radius * 0.5
+
 	var segment_length := start.distance_to(end)
 	if segment_length < 0.005:
-		return
+		return start_radius
+
+	var top_radius := start_radius * 0.9
 
 	var mesh_instance := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius * 0.82
-	mesh.bottom_radius = radius
+	mesh.top_radius = top_radius
+	mesh.bottom_radius = start_radius
 	mesh.height = segment_length
-	mesh.radial_segments = 8
+	mesh.radial_segments = 12
+	mesh.rings = 3
 	mesh_instance.mesh = mesh
 	mesh_instance.material_override = _germ_hypha_material
 
 	var mid := (start + end) * 0.5
 	mesh_instance.position = mid
-	mesh_instance.look_at(end, Vector3.UP)
-	mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	if dir.length_squared() > 0.0001:
+		var up := Vector3.UP
+		if absf(dir.dot(up)) > 0.98:
+			up = Vector3.RIGHT
+		mesh_instance.look_at(mid + dir, up)
+		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+	_germ_root.add_child(mesh_instance)
+	return top_radius
+
+
+func _add_hypha_junction(at: Vector3, radius: float) -> void:
+	if radius <= 0.0 or _germ_root == null:
+		return
+	var mesh_instance := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = radius * 1.08
+	sphere.height = radius * 2.16
+	sphere.radial_segments = 10
+	sphere.rings = 5
+	mesh_instance.mesh = sphere
+	mesh_instance.material_override = _germ_hypha_material
+	mesh_instance.position = at
 	_germ_root.add_child(mesh_instance)
 
 
@@ -257,6 +287,7 @@ func _clear_germination_visuals() -> void:
 	_germ_root = null
 	_germ_segment_count = 0
 	_main_germ_tip = Vector3.ZERO
+	_main_germ_radius = 0.022
 
 
 func _update_landing_state() -> void:

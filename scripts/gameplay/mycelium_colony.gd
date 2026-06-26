@@ -12,6 +12,7 @@ class HyphaTip:
 	var depth: int = 0
 	var energy: float = 1.0
 	var age: float = 0.0
+	var radius: float = 0.018
 
 
 @export var growth_speed: float = 6.2
@@ -113,7 +114,9 @@ func _create_initial_hypha() -> void:
 	tip.direction = Vector3(0.0, -0.08, 1.0).normalized()
 	tip.depth = 0
 	_tips.append(tip)
-	_add_hypha_segment(Vector3.ZERO, Vector3(0.0, -0.008, 0.1), 0, tip.direction)
+	tip.radius = _add_hypha_segment(
+		Vector3.ZERO, Vector3(0.0, -0.008, 0.1), 0, tip.direction, tip.radius, false
+	)
 
 
 func _physics_process(delta: float) -> void:
@@ -121,8 +124,11 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var growing := _is_growing()
-	if growing and _branch_count < max_branches:
-		_grow_step(delta)
+	if growing:
+		if _branch_count < max_branches:
+			_grow_step(delta)
+		elif GameState.colonization_percent < 80.0:
+			_absorb_from_tips(delta)
 		_update_tip_glows(true)
 	else:
 		_update_tip_glows(false)
@@ -179,15 +185,17 @@ func _grow_step(delta: float) -> void:
 		var start := tip.position
 		var end := start + tip.direction * length
 		tip.direction = (end - start).normalized()
-		_add_hypha_segment(start, end, tip.depth, tip.direction)
+		tip.radius = _add_hypha_segment(start, end, tip.depth, tip.direction, tip.radius)
 		tip.position = end
 		tip.depth += 1
 		new_tips.append(tip)
 
 		var near_food := dist <= absorb_range * 1.4
 		if tip.depth > 3 and near_food and _rng.randf() < branch_chance and _branch_count < max_branches - 1:
+			_add_hypha_junction(tip.position, tip.radius)
 			var branch := HyphaTip.new()
 			branch.position = tip.position
+			branch.radius = tip.radius
 			branch.direction = _substrate_direction(
 				tip.direction.rotated(Vector3.UP, _rng.randf_range(0.35, 0.75) * (1.0 if _rng.randf() > 0.5 else -1.0))
 			)
@@ -196,7 +204,9 @@ func _grow_step(delta: float) -> void:
 			var branch_start := branch.position
 			var branch_end := branch_start + branch.direction * length * 0.55
 			branch.direction = (branch_end - branch_start).normalized()
-			_add_hypha_segment(branch_start, branch_end, branch.depth, branch.direction)
+			branch.radius = _add_hypha_segment(
+				branch_start, branch_end, branch.depth, branch.direction, branch.radius
+			)
 			branch.position = branch_end
 			branch.depth += 1
 			new_tips.append(branch)
@@ -204,6 +214,20 @@ func _grow_step(delta: float) -> void:
 	_tips = new_tips
 	if _tips.is_empty():
 		_create_initial_hypha()
+
+
+func _absorb_from_tips(delta: float) -> void:
+	for tip in _tips:
+		var nutrient := _find_nearest_nutrient_for_tip(tip)
+		if nutrient == null:
+			continue
+		var target := to_local(nutrient.global_position)
+		if target.distance_to(tip.position) > absorb_range:
+			continue
+		var efficiency := MushroomSpeciesData.digest_efficiency(
+			_species, nutrient.get_nutrient_type()
+		)
+		_intake_from_nutrient(nutrient, delta, efficiency, 1.0 + efficiency * 0.4)
 
 
 func _explore_step(tip: HyphaTip, delta: float, temp_factor: float, new_tips: Array[HyphaTip]) -> void:
@@ -216,7 +240,7 @@ func _explore_step(tip: HyphaTip, delta: float, temp_factor: float, new_tips: Ar
 	var start := tip.position
 	var end := start + tip.direction * length
 	tip.direction = (end - start).normalized()
-	_add_hypha_segment(start, end, tip.depth, tip.direction)
+	tip.radius = _add_hypha_segment(start, end, tip.depth, tip.direction, tip.radius)
 	tip.position = end
 	tip.depth += 1
 	new_tips.append(tip)
@@ -275,26 +299,39 @@ func _find_nearest_nutrient_for_tip(tip: HyphaTip) -> NutrientSource:
 	return best
 
 
-func _add_hypha_segment(start: Vector3, end: Vector3, depth: int, growth_dir: Vector3) -> void:
+func _add_hypha_segment(
+	start: Vector3,
+	end: Vector3,
+	depth: int,
+	growth_dir: Vector3,
+	start_radius: float,
+	overlap_start: bool = true
+) -> float:
+	var dir := growth_dir
+	if dir.length_squared() < 0.0001:
+		dir = (end - start).normalized()
+	if overlap_start and start_radius > 0.0 and dir.length_squared() > 0.0001:
+		start = start - dir * start_radius * 0.5
+
 	var segment_length := start.distance_to(end)
 	if segment_length < 0.006:
-		return
+		return start_radius
 
 	var depth_t := clampf(1.0 - float(depth) / 32.0, 0.28, 1.0)
-	var bottom_r := lerpf(0.004, 0.022, depth_t) * _rng.randf_range(0.94, 1.04)
-	var top_r := bottom_r * _rng.randf_range(0.75, 0.9)
+	var bottom_r := start_radius if start_radius > 0.0 else lerpf(0.004, 0.022, depth_t)
+	var top_r := bottom_r * lerpf(0.88, 0.94, depth_t)
 
 	var mesh_instance := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = top_r
 	mesh.bottom_radius = bottom_r
 	mesh.height = segment_length
-	mesh.radial_segments = 10
-	mesh.rings = 2
+	mesh.radial_segments = 12
+	mesh.rings = 3
 	mesh_instance.mesh = mesh
 
 	var mat := _hypha_material.duplicate() as StandardMaterial3D
-	var shade := _rng.randf_range(0.96, 1.04)
+	var shade := _rng.randf_range(0.97, 1.03)
 	mat.albedo_color = Color(
 		0.94 * shade, 0.9 * shade, 0.82 * shade, 0.9
 	)
@@ -302,16 +339,32 @@ func _add_hypha_segment(start: Vector3, end: Vector3, depth: int, growth_dir: Ve
 
 	var mid := (start + end) * 0.5
 	mesh_instance.position = mid
-	if growth_dir.length_squared() > 0.0001:
+	if dir.length_squared() > 0.0001:
 		var up := Vector3.UP
-		if absf(growth_dir.dot(up)) > 0.98:
+		if absf(dir.dot(up)) > 0.98:
 			up = Vector3.RIGHT
-		mesh_instance.look_at(mid + growth_dir, up)
+		mesh_instance.look_at(mid + dir, up)
 		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
 
 	_hypha_root.add_child(mesh_instance)
 	_branch_count += 1
-	GameState.add_colonization(clampf(segment_length * 1.75, 0.05, 0.32))
+	GameState.add_colonization(clampf(segment_length * 4.8, 0.12, 0.52))
+	return top_r
+
+
+func _add_hypha_junction(at: Vector3, radius: float) -> void:
+	if radius <= 0.0:
+		return
+	var mesh_instance := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = radius * 1.08
+	sphere.height = radius * 2.16
+	sphere.radial_segments = 10
+	sphere.rings = 5
+	mesh_instance.mesh = sphere
+	mesh_instance.material_override = _hypha_material
+	mesh_instance.position = at
+	_hypha_root.add_child(mesh_instance)
 
 
 func _update_tip_glows(show: bool) -> void:
@@ -321,8 +374,9 @@ func _update_tip_glows(show: bool) -> void:
 	for tip in _tips:
 		var glow := MeshInstance3D.new()
 		var sphere := SphereMesh.new()
-		sphere.radius = 0.016
-		sphere.height = 0.032
+		var glow_r := maxf(tip.radius, 0.012) * 1.15
+		sphere.radius = glow_r
+		sphere.height = glow_r * 2.0
 		sphere.radial_segments = 8
 		sphere.rings = 4
 		glow.mesh = sphere
