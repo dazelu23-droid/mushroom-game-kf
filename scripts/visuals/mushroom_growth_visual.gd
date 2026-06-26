@@ -8,6 +8,8 @@ signal growth_complete
 
 const ADULT_SCENE := preload("res://assets/mushroom/lowpoly_mushrooms.glb")
 
+@export var adult_height: float = 1.2
+
 enum GrowthStage {
 	HYPHAL_KNOT,
 	PRIMORDIUM,
@@ -21,6 +23,7 @@ var _stage: GrowthStage = GrowthStage.HYPHAL_KNOT
 var _progress := 0.0
 var _active := false
 var _adult_shown := false
+var _adult_cap_height := 0.8
 
 @onready var _procedural_root: Node3D = $ProceduralRoot
 @onready var _knot: MeshInstance3D = $ProceduralRoot/HyphalKnot
@@ -55,6 +58,7 @@ func _reset_visuals() -> void:
 	_pin_stipe.scale = Vector3(0.08, 0.01, 0.08)
 	_pin_cap.scale = Vector3(0.06, 0.04, 0.06)
 	_adult_slot.visible = false
+	_adult_slot.scale = Vector3.ONE
 	for child in _adult_slot.get_children():
 		child.queue_free()
 
@@ -144,23 +148,63 @@ func _animate_cap_expansion() -> void:
 func _show_adult_model() -> void:
 	if _adult_shown:
 		return
-	_adult_shown = true
-	_procedural_root.visible = false
-	_adult_slot.visible = true
 
 	var adult_pack := ADULT_SCENE.instantiate() as Node3D
 	_adult_slot.add_child(adult_pack)
 
 	var mesh_name: String = GameState.selected_species.get("mesh_name", "mushroom_01")
 	_hide_all_mushroom_meshes(adult_pack)
-	var target := adult_pack.find_child(mesh_name, true, false) as Node3D
-	if target:
-		target.visible = true
-		_align_adult_mesh(adult_pack, target)
+	var target := _find_mushroom_node(adult_pack, mesh_name)
+	if target == null:
+		push_warning("Adult mushroom: mesh '%s' not found in GLB." % mesh_name)
+		adult_pack.queue_free()
+		return
+
+	_adult_shown = true
+	_procedural_root.visible = false
+	_adult_slot.visible = true
+	target.visible = true
+	_center_and_scale_adult(adult_pack, target)
 
 	var tween := create_tween()
 	_adult_slot.scale = Vector3.ONE * 0.01
 	tween.tween_property(_adult_slot, "scale", Vector3.ONE, 1.2).set_trans(Tween.TRANS_ELASTIC)
+
+
+func _find_mushroom_node(root: Node, mesh_name: String) -> Node3D:
+	var exact := root.find_child(mesh_name, true, false) as Node3D
+	if exact:
+		return exact
+	for node in root.find_children("mushroom_*", "Node3D", true, false):
+		if node.name == mesh_name or node.name.begins_with(mesh_name + "_"):
+			return node as Node3D
+	return null
+
+
+func _center_and_scale_adult(pack: Node3D, target: Node3D) -> void:
+	var mesh_node := _get_mesh_instance(target)
+	if mesh_node == null or mesh_node.mesh == null:
+		pack.position = -target.position
+		_adult_cap_height = adult_height * 0.75
+		return
+
+	var aabb := mesh_node.mesh.get_aabb()
+	var max_dim := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
+	var scale_factor := adult_height / max_dim if max_dim > 0.001 else 1.0
+	pack.scale = Vector3.ONE * scale_factor
+	pack.position = -target.position * scale_factor
+	pack.position.y -= aabb.position.y * scale_factor
+	_adult_cap_height = aabb.size.y * scale_factor
+
+
+func _get_mesh_instance(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node as MeshInstance3D
+	for child in node.get_children():
+		var found := _get_mesh_instance(child)
+		if found:
+			return found
+	return null
 
 
 func _hide_all_mushroom_meshes(root: Node) -> void:
@@ -173,20 +217,13 @@ func _hide_all_mushroom_meshes(root: Node) -> void:
 func _is_mushroom_root_node(node_name: String) -> bool:
 	if not node_name.begins_with("mushroom_"):
 		return false
-	var suffix: String = node_name.trim_prefix("mushroom_")
+	var suffix: String = node_name.trim_prefix("mushroom_").split("_")[0]
 	return suffix.is_valid_int()
-
-
-func _align_adult_mesh(root: Node3D, target: Node3D) -> void:
-	var mesh_node: MeshInstance3D = target.get_child(0) as MeshInstance3D if target.get_child_count() > 0 else null
-	if mesh_node and mesh_node.mesh:
-		var aabb: AABB = mesh_node.mesh.get_aabb()
-		root.position.y = -aabb.position.y * target.scale.y
 
 
 func get_cap_position() -> Vector3:
 	if _adult_slot.visible:
-		return _adult_slot.global_position + Vector3.UP * 0.8
+		return _adult_slot.global_position + Vector3.UP * _adult_cap_height
 	if _pin_cap.visible:
 		return _pin_cap.global_position
 	return global_position + Vector3.UP * 0.2
