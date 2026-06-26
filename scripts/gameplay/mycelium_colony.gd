@@ -17,7 +17,7 @@ class HyphaTip:
 @export var growth_speed: float = 6.2
 @export var max_branches: int = 180
 @export var tip_search_range: float = 16.0
-@export var absorb_range: float = 3.2
+@export var absorb_range: float = 4.5
 @export var branch_chance: float = 0.09
 @export var chemotaxis_strength: float = 0.78
 @export var tortuosity: float = 0.22
@@ -154,7 +154,16 @@ func _grow_step(delta: float) -> void:
 		var target := to_local(nutrient.global_position)
 		var to_target := target - tip.position
 		var dist := to_target.length()
-		if dist < 0.02:
+
+		var efficiency := MushroomSpeciesData.digest_efficiency(
+			_species, nutrient.get_nutrient_type()
+		)
+		var speed_boost := 1.0 + efficiency * 0.4
+		if dist < absorb_range:
+			speed_boost += 0.55
+			_intake_from_nutrient(nutrient, delta, efficiency, speed_boost)
+
+		if dist < 0.08:
 			new_tips.append(tip)
 			continue
 
@@ -165,13 +174,6 @@ func _grow_step(delta: float) -> void:
 			_rng.randf_range(-tortuosity, tortuosity) * delta * 4.0
 		)
 		tip.direction = _substrate_direction(tip.direction)
-
-		var efficiency := MushroomSpeciesData.digest_efficiency(
-			_species, nutrient.get_nutrient_type()
-		)
-		var speed_boost := 1.0 + efficiency * 0.4
-		if dist < absorb_range:
-			speed_boost += 0.55
 
 		var length := growth_speed * temp_factor * speed_boost * delta * _rng.randf_range(0.7, 1.0)
 		var start := tip.position
@@ -199,16 +201,6 @@ func _grow_step(delta: float) -> void:
 			branch.depth += 1
 			new_tips.append(branch)
 
-		if dist <= absorb_range:
-			var absorb_rate := 4.2 * efficiency * delta * speed_boost
-			var absorbed: float = nutrient.absorb(absorb_rate)
-			if absorbed > 0.0:
-				GameState.add_nutrients(absorbed)
-				GameState.set_colonization(
-					GameState.colonization_percent + absorbed * 0.24 * efficiency
-				)
-				nutrient.pulse_absorption(absorbed)
-
 	_tips = new_tips
 	if _tips.is_empty():
 		_create_initial_hypha()
@@ -228,6 +220,20 @@ func _explore_step(tip: HyphaTip, delta: float, temp_factor: float, new_tips: Ar
 	tip.position = end
 	tip.depth += 1
 	new_tips.append(tip)
+
+
+func _intake_from_nutrient(
+	nutrient: NutrientSource,
+	delta: float,
+	efficiency: float,
+	speed_boost: float
+) -> void:
+	var absorb_rate := 4.8 * efficiency * delta * speed_boost
+	var absorbed: float = nutrient.absorb(absorb_rate)
+	if absorbed > 0.0:
+		GameState.add_nutrients(absorbed)
+		GameState.add_colonization(absorbed * 0.4 * efficiency)
+		nutrient.pulse_absorption(absorbed)
 
 
 func _substrate_direction(dir: Vector3) -> Vector3:
@@ -305,6 +311,7 @@ func _add_hypha_segment(start: Vector3, end: Vector3, depth: int, growth_dir: Ve
 
 	_hypha_root.add_child(mesh_instance)
 	_branch_count += 1
+	GameState.add_colonization(clampf(segment_length * 1.75, 0.05, 0.32))
 
 
 func _update_tip_glows(show: bool) -> void:

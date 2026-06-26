@@ -53,6 +53,10 @@ func add_nutrients(amount: float) -> void:
 	nutrients_changed.emit(nutrients, max_nutrients)
 
 
+func add_colonization(amount: float) -> void:
+	set_colonization(colonization_percent + amount)
+
+
 func set_colonization(percent: float) -> void:
 	colonization_percent = clampf(percent, 0.0, 100.0)
 	colonization_changed.emit(colonization_percent)

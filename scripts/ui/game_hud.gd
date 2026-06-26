@@ -5,6 +5,7 @@ class_name GameHUD
 @onready var fact_label: RichTextLabel = %FactLabel
 @onready var objective_label: Label = %ObjectiveLabel
 @onready var stats_label: Label = %StatsLabel
+@onready var colonization_bar: ProgressBar = %ColonizationBar
 @onready var env_label: Label = %EnvLabel
 @onready var species_label: Label = %SpeciesLabel
 @onready var land_button: Button = %LandButton
@@ -24,6 +25,11 @@ func _ready() -> void:
 	land_button.pressed.connect(_on_land_pressed)
 	grow_button.visible = false
 	grow_button.toggled.connect(_on_grow_toggled)
+	_refresh_colonization_display()
+
+
+func refresh_colonization_display() -> void:
+	_refresh_colonization_display()
 
 
 func bind_spore(spore: SporePlayer) -> void:
@@ -108,6 +114,10 @@ func _on_phase_changed(phase: LifeCycle.Phase) -> void:
 	var info: Dictionary = LifeCycle.PHASE_FACTS[phase]
 	phase_label.text = String(info.get("title", ""))
 	_update_controls_hint(phase)
+	if phase == LifeCycle.Phase.MYCELIUM_COLONIZATION:
+		_refresh_colonization_display()
+	elif phase != LifeCycle.Phase.ENVIRONMENTAL_TRIGGER:
+		colonization_bar.visible = false
 
 
 func _update_controls_hint(phase: LifeCycle.Phase) -> void:
@@ -132,6 +142,22 @@ func _on_nutrients_changed(amount: float, max_amount: float) -> void:
 
 func _on_colonization_changed(percent: float) -> void:
 	_update_stats(GameState.nutrients, GameState.max_nutrients, percent)
+	_update_colonization_bar(percent)
+
+
+func _refresh_colonization_display() -> void:
+	var show_bar := GameState.current_phase == LifeCycle.Phase.MYCELIUM_COLONIZATION
+	colonization_bar.visible = show_bar
+	_update_stats(GameState.nutrients, GameState.max_nutrients, GameState.colonization_percent)
+	_update_colonization_bar(GameState.colonization_percent)
+
+
+func _update_colonization_bar(percent: float) -> void:
+	colonization_bar.value = percent
+	if percent >= 80.0:
+		colonization_bar.tooltip_text = "Colonization complete — environmental trigger next"
+	else:
+		colonization_bar.tooltip_text = "Substrate colonization: %.0f%% (need 80%%)" % percent
 
 
 func _update_stats(nutrients: float, max_nutrients: float, colonization: float) -> void:

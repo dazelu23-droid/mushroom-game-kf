@@ -113,6 +113,7 @@ func _on_germination_complete() -> void:
 	world_camera.current = true
 	hud.bind_mycelium(mycelium)
 	hud.set_grow_ui_visible(true)
+	hud.refresh_colonization_display()
 	hud.show_objective(
 		"Hold SPACE or press Grow Hyphae to extend apical tips toward dead matter. "
 		+ "Species enzymes digest lignin/cellulose — colonize to 80%."
