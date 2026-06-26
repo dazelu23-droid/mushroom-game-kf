@@ -4,6 +4,7 @@ extends Node3D
 const ADULT_SCENE := preload("res://assets/mushroom/lowpoly_mushrooms.glb")
 
 @export var auto_rotate_speed: float = 0.35
+@export var preview_height: float = 1.4
 
 @onready var _model_slot: Node3D = $ModelSlot
 @onready var _camera: Camera3D = $Camera3D
@@ -11,6 +12,7 @@ const ADULT_SCENE := preload("res://assets/mushroom/lowpoly_mushrooms.glb")
 var _current_pack: Node3D
 var _yaw := 0.0
 var _pitch := -0.15
+var _auto_rotate_pause := 0.0
 
 
 func _ready() -> void:
@@ -42,23 +44,37 @@ func show_mesh(mesh_name: String) -> void:
 	_hide_all_mushroom_meshes(pack)
 
 	var target := pack.find_child(mesh_name, true, false) as Node3D
-	if target:
-		target.visible = true
-		_align_mesh(pack, target)
-		_fit_camera_to_mesh(target)
+	if target == null:
+		push_warning("Species preview: mesh '%s' not found in GLB." % mesh_name)
+		return
+
+	target.visible = true
+	_center_and_scale(pack, target)
+	_fit_camera_to_mesh(target)
 
 	_yaw = 0.0
 	_pitch = -0.15
 	_model_slot.rotation = Vector3(_pitch, _yaw, 0.0)
 
 
+func _center_and_scale(pack: Node3D, target: Node3D) -> void:
+	var mesh_node := _get_mesh_instance(target)
+	if mesh_node == null or mesh_node.mesh == null:
+		pack.position = -target.position
+		return
+
+	var aabb := mesh_node.mesh.get_aabb()
+	var max_dim := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
+	var scale_factor := preview_height / max_dim if max_dim > 0.001 else 1.0
+	pack.scale = Vector3.ONE * scale_factor
+	pack.position = -target.position * scale_factor
+	pack.position.y -= aabb.position.y * scale_factor
+
+
 func apply_drag(relative: Vector2) -> void:
 	_yaw -= relative.x * 0.008
 	_pitch = clampf(_pitch - relative.y * 0.008, -0.6, 0.35)
 	_auto_rotate_pause = 2.0
-
-
-var _auto_rotate_pause := 0.0
 
 
 func _process(delta: float) -> void:
@@ -70,17 +86,25 @@ func _process(delta: float) -> void:
 
 
 func _fit_camera_to_mesh(target: Node3D) -> void:
-	var mesh_node := target.get_child(0) as MeshInstance3D if target.get_child_count() > 0 else null
+	var mesh_node := _get_mesh_instance(target)
 	if mesh_node == null or mesh_node.mesh == null:
-		_camera.position = Vector3(0.0, 1.0, 3.2)
+		_camera.position = Vector3(0.0, 0.8, 3.0)
+		_camera.look_at(Vector3(0.0, 0.6, 0.0), Vector3.UP)
 		return
 
-	var local_aabb := mesh_node.mesh.get_aabb()
-	var height := local_aabb.size.y * target.scale.y
-	var width := maxf(local_aabb.size.x, local_aabb.size.z) * target.scale.x
+	var aabb := mesh_node.mesh.get_aabb()
+	var scaled_size := aabb.size * target.scale * _current_pack.scale if _current_pack else aabb.size
+	var height := scaled_size.y
+	var width := maxf(scaled_size.x, scaled_size.z)
 	var size := maxf(height, width)
-	_camera.position = Vector3(0.0, height * 0.45 + 0.15, size * 2.1 + 1.2)
+	_camera.position = Vector3(0.0, height * 0.45 + 0.1, size * 2.4 + 1.0)
 	_camera.look_at(Vector3(0.0, height * 0.35, 0.0), Vector3.UP)
+
+
+func _get_mesh_instance(target: Node3D) -> MeshInstance3D:
+	if target.get_child_count() == 0:
+		return null
+	return target.get_child(0) as MeshInstance3D
 
 
 func _hide_all_mushroom_meshes(root: Node) -> void:
@@ -95,10 +119,3 @@ func _is_mushroom_root_node(node_name: String) -> bool:
 		return false
 	var suffix: String = node_name.trim_prefix("mushroom_")
 	return suffix.is_valid_int()
-
-
-func _align_mesh(root: Node3D, target: Node3D) -> void:
-	var mesh_node := target.get_child(0) as MeshInstance3D if target.get_child_count() > 0 else null
-	if mesh_node and mesh_node.mesh:
-		var aabb: AABB = mesh_node.mesh.get_aabb()
-		root.position.y = -aabb.position.y * target.scale.y

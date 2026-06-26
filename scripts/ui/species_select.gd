@@ -18,7 +18,7 @@ func _ready() -> void:
 	_populate_species()
 	species_list.item_selected.connect(_on_species_selected)
 	start_button.pressed.connect(_on_start_pressed)
-	_on_species_selected(0)
+	call_deferred("_on_species_selected", 0)
 
 
 func _input(event: InputEvent) -> void:
