@@ -6,7 +6,7 @@ extends Node3D
 
 signal growth_complete
 
-const ADULT_SCENE := preload("res://assets/mushroom/lowpoly_mushrooms.glb")
+const MushroomMeshLoader := preload("res://scripts/visuals/mushroom_mesh_loader.gd")
 
 @export var adult_height: float = 1.2
 
@@ -88,7 +88,8 @@ func _process(delta: float) -> void:
 		GrowthStage.CAP_EXPANSION:
 			_animate_cap_expansion()
 		GrowthStage.MATURE:
-			_show_adult_model()
+			if not _adult_shown:
+				_show_adult_model()
 			growth_complete.emit()
 			_active = false
 
@@ -103,7 +104,6 @@ func _animate_hyphal_knot() -> void:
 
 
 func _animate_primordium() -> void:
-	# Undifferentiated hyphal ball 1–5 mm; tissues pattern internally.
 	_primordium.scale = Vector3.ONE * lerpf(0.02, 0.05, _progress * 4.0)
 	if _progress >= 0.2:
 		_stage = GrowthStage.PIN
@@ -114,7 +114,6 @@ func _animate_primordium() -> void:
 
 
 func _animate_pin() -> void:
-	# Pin stage: 3–8 mm, basic cap-and-stem architecture visible.
 	_pin_stipe.scale.y = lerpf(0.01, 0.08, _progress * 3.0)
 	_pin_cap.position.y = _pin_stipe.scale.y * 0.5 + 0.02
 	_pin_cap.scale = Vector3.ONE * lerpf(0.04, 0.08, _progress * 3.0)
@@ -124,7 +123,6 @@ func _animate_pin() -> void:
 
 
 func _animate_stipe_elongation() -> void:
-	# Turgor-driven cell expansion: stipe elongates BEFORE cap (Fungus Fact Friday #234).
 	_pin_stipe.scale.y = lerpf(0.08, 0.45, _progress * 2.5)
 	_pin_cap.position.y = _pin_stipe.scale.y * 0.5 + 0.04
 	if _progress >= 0.35:
@@ -146,79 +144,22 @@ func _animate_cap_expansion() -> void:
 
 
 func _show_adult_model() -> void:
-	if _adult_shown:
-		return
-
-	var adult_pack := ADULT_SCENE.instantiate() as Node3D
-	_adult_slot.add_child(adult_pack)
-
 	var mesh_name: String = GameState.selected_species.get("mesh_name", "mushroom_01")
-	_hide_all_mushroom_meshes(adult_pack)
-	var target := _find_mushroom_node(adult_pack, mesh_name)
-	if target == null:
-		push_warning("Adult mushroom: mesh '%s' not found in GLB." % mesh_name)
-		adult_pack.queue_free()
+	var loaded: Dictionary = MushroomMeshLoader.create_display(mesh_name, adult_height, _adult_slot)
+	if loaded.is_empty():
+		push_warning("Adult mushroom: mesh '%s' could not be loaded." % mesh_name)
 		return
 
 	_adult_shown = true
 	_procedural_root.visible = false
 	_adult_slot.visible = true
-	target.visible = true
-	_center_and_scale_adult(adult_pack, target)
+
+	var display: MeshInstance3D = loaded["mesh_instance"]
+	_adult_cap_height = float(loaded.get("cap_height", adult_height * 0.75))
 
 	var tween := create_tween()
 	_adult_slot.scale = Vector3.ONE * 0.01
 	tween.tween_property(_adult_slot, "scale", Vector3.ONE, 1.2).set_trans(Tween.TRANS_ELASTIC)
-
-
-func _find_mushroom_node(root: Node, mesh_name: String) -> Node3D:
-	var exact := root.find_child(mesh_name, true, false) as Node3D
-	if exact:
-		return exact
-	for node in root.find_children("mushroom_*", "Node3D", true, false):
-		if node.name == mesh_name or node.name.begins_with(mesh_name + "_"):
-			return node as Node3D
-	return null
-
-
-func _center_and_scale_adult(pack: Node3D, target: Node3D) -> void:
-	var mesh_node := _get_mesh_instance(target)
-	if mesh_node == null or mesh_node.mesh == null:
-		pack.position = -target.position
-		_adult_cap_height = adult_height * 0.75
-		return
-
-	var aabb := mesh_node.mesh.get_aabb()
-	var max_dim := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
-	var scale_factor := adult_height / max_dim if max_dim > 0.001 else 1.0
-	pack.scale = Vector3.ONE * scale_factor
-	pack.position = -target.position * scale_factor
-	pack.position.y -= aabb.position.y * scale_factor
-	_adult_cap_height = aabb.size.y * scale_factor
-
-
-func _get_mesh_instance(node: Node) -> MeshInstance3D:
-	if node is MeshInstance3D:
-		return node as MeshInstance3D
-	for child in node.get_children():
-		var found := _get_mesh_instance(child)
-		if found:
-			return found
-	return null
-
-
-func _hide_all_mushroom_meshes(root: Node) -> void:
-	for child in root.get_children():
-		if _is_mushroom_root_node(child.name):
-			child.visible = false
-		_hide_all_mushroom_meshes(child)
-
-
-func _is_mushroom_root_node(node_name: String) -> bool:
-	if not node_name.begins_with("mushroom_"):
-		return false
-	var suffix: String = node_name.trim_prefix("mushroom_").split("_")[0]
-	return suffix.is_valid_int()
 
 
 func get_cap_position() -> Vector3:

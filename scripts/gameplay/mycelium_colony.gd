@@ -37,6 +37,8 @@ var _tip_glows: Node3D
 var _branch_count := 0
 var _species: Dictionary = {}
 var _tip_glow_pool: Array[MeshInstance3D] = []
+var _network_nodes: Array[Vector3] = []
+var _junction_mesh: SphereMesh
 
 
 func _ready() -> void:
@@ -54,8 +56,11 @@ func setup(origin: Vector3, nutrients: Array[NutrientSource]) -> void:
 		child.queue_free()
 	for child in _tip_glows.get_children():
 		child.queue_free()
+	_tip_glow_pool.clear()
 	_tips.clear()
 	_branch_count = 0
+	_network_nodes.clear()
+	_tip_glow_pool.clear()
 	position = origin
 	_nutrient_sources = nutrients
 	_species = GameState.selected_species
@@ -108,6 +113,10 @@ func _build_materials() -> void:
 	_tip_glow_material.emission_energy_multiplier = 1.8
 	_tip_glow_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_tip_glow_material.roughness = 0.15
+
+	_junction_mesh = SphereMesh.new()
+	_junction_mesh.radial_segments = 8
+	_junction_mesh.rings = 4
 
 
 func _create_initial_hypha() -> void:
@@ -322,7 +331,8 @@ func _add_hypha_segment(
 	if dir.length_squared() < 0.0001:
 		dir = (end - start).normalized()
 	if overlap_start and start_radius > 0.0 and dir.length_squared() > 0.0001:
-		start = start - dir * start_radius * 0.5
+		start = start - dir * start_radius * 0.65
+		_add_hypha_junction(start + dir * start_radius * 0.65, start_radius)
 
 	var segment_length := start.distance_to(end)
 	if segment_length < 0.006:
@@ -330,23 +340,50 @@ func _add_hypha_segment(
 
 	var depth_t := clampf(1.0 - float(depth) / 32.0, 0.28, 1.0)
 	var bottom_r := start_radius if start_radius > 0.0 else lerpf(0.004, 0.022, depth_t)
-	var top_r := bottom_r * lerpf(0.88, 0.94, depth_t)
+	var top_r := bottom_r * lerpf(0.92, 0.96, depth_t)
+	var mid_r := (bottom_r + top_r) * 0.5
+
+	_add_hypha_cylinder(start, end, bottom_r, top_r, dir)
+	if segment_length > 0.04 and _rng.randf() > 0.35:
+		var axis := Vector3(
+			_rng.randf_range(-1.0, 1.0),
+			_rng.randf_range(-0.35, 0.35),
+			_rng.randf_range(-1.0, 1.0)
+		).normalized()
+		if axis.length_squared() > 0.0001:
+			var bend := dir.rotated(axis, _rng.randf_range(-0.12, 0.12))
+			var mid := start + dir * segment_length * 0.5
+			var mid_end := mid + bend * segment_length * 0.52
+			_add_hypha_cylinder(mid, mid_end, mid_r, top_r, (mid_end - mid).normalized())
+
+	_register_network_point(end, top_r)
+	_try_anastomosis(end, top_r)
+
+	_branch_count += 1
+	GameState.add_colonization(clampf(segment_length * 5.2, 0.15, 0.55))
+	return top_r
+
+
+func _add_hypha_cylinder(
+	start: Vector3,
+	end: Vector3,
+	bottom_r: float,
+	top_r: float,
+	dir: Vector3
+) -> void:
+	var segment_length := start.distance_to(end)
+	if segment_length < 0.004:
+		return
 
 	var mesh_instance := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = top_r
 	mesh.bottom_radius = bottom_r
 	mesh.height = segment_length
-	mesh.radial_segments = 12
-	mesh.rings = 3
+	mesh.radial_segments = 10
+	mesh.rings = 2
 	mesh_instance.mesh = mesh
-
-	var mat := _hypha_material.duplicate() as StandardMaterial3D
-	var shade := _rng.randf_range(0.97, 1.03)
-	mat.albedo_color = Color(
-		0.94 * shade, 0.9 * shade, 0.82 * shade, 0.9
-	)
-	mesh_instance.material_override = mat
+	mesh_instance.material_override = _hypha_material
 
 	var mid := (start + end) * 0.5
 	mesh_instance.position = mid
@@ -358,20 +395,45 @@ func _add_hypha_segment(
 		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
 
 	_hypha_root.add_child(mesh_instance)
-	_branch_count += 1
-	GameState.add_colonization(clampf(segment_length * 5.2, 0.15, 0.55))
-	return top_r
+
+
+func _register_network_point(at: Vector3, radius: float) -> void:
+	_network_nodes.append(at)
+	if _network_nodes.size() > 320:
+		_network_nodes.pop_front()
+	_add_hypha_junction(at, radius * 0.92)
+
+
+func _try_anastomosis(at: Vector3, radius: float) -> void:
+	var connect_range := radius * 8.0
+	for node in _network_nodes:
+		if node.is_equal_approx(at):
+			continue
+		var dist := node.distance_to(at)
+		if dist > connect_range or dist < radius * 1.2:
+			continue
+		_add_hypha_bridge(node, at, radius * 0.72)
+		return
+
+
+func _add_hypha_bridge(from: Vector3, to: Vector3, bridge_radius: float) -> void:
+	var dir := to - from
+	var length := dir.length()
+	if length < 0.015:
+		return
+	dir = dir.normalized()
+	_add_hypha_cylinder(from, to, bridge_radius, bridge_radius * 0.94, dir)
+	_add_hypha_junction(from, bridge_radius)
+	_add_hypha_junction(to, bridge_radius * 0.94)
 
 
 func _add_hypha_junction(at: Vector3, radius: float) -> void:
 	if radius <= 0.0:
 		return
 	var mesh_instance := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = radius * 1.08
-	sphere.height = radius * 2.16
-	sphere.radial_segments = 10
-	sphere.rings = 5
+	var sphere := _junction_mesh.duplicate() as SphereMesh
+	sphere.radius = radius * 1.05
+	sphere.height = radius * 2.1
 	mesh_instance.mesh = sphere
 	mesh_instance.material_override = _hypha_material
 	mesh_instance.position = at

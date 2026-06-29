@@ -236,7 +236,9 @@ func _add_germ_segment(index: int) -> void:
 func _add_hypha_mesh(start: Vector3, end: Vector3, start_radius: float, overlap_start: bool = true) -> float:
 	var dir := (end - start).normalized()
 	if overlap_start and start_radius > 0.0 and dir.length_squared() > 0.0001:
-		start = start - dir * start_radius * 0.5
+		var joint := start
+		start = start - dir * start_radius * 0.65
+		_add_hypha_junction(joint, start_radius)
 
 	var segment_length := start.distance_to(end)
 	if segment_length < 0.005:
@@ -263,6 +265,7 @@ func _add_hypha_mesh(start: Vector3, end: Vector3, start_radius: float, overlap_
 		mesh_instance.look_at(mid + dir, up)
 		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
 	_germ_root.add_child(mesh_instance)
+	_add_hypha_junction(end, top_radius * 0.95)
 	return top_radius
 
 
