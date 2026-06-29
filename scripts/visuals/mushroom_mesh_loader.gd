@@ -1,17 +1,17 @@
 class_name MushroomMeshLoader
 extends RefCounted
 
-## Loads a single species mesh from the GLB pack and centers it on the anchor node.
+## Loads a single species mesh from the GLB pack and plants it at the anchor origin.
 
 const ADULT_SCENE := preload("res://assets/mushroom/lowpoly_mushrooms.glb")
 
 
 static func create_display(mesh_name: String, desired_height: float, anchor: Node3D) -> Dictionary:
-	if anchor.get_tree() == null:
+	if not anchor.is_inside_tree():
 		return {}
 
 	var temp := ADULT_SCENE.instantiate() as Node3D
-	anchor.get_tree().root.add_child(temp)
+	anchor.add_child(temp)
 	temp.visible = false
 
 	_hide_all_mushroom_meshes(temp)
@@ -28,36 +28,48 @@ static func create_display(mesh_name: String, desired_height: float, anchor: Nod
 		temp.queue_free()
 		return {}
 
+	var local_aabb := source.mesh.get_aabb()
+	var rel_xform := anchor.global_transform.affine_inverse() * source.global_transform
+	var world_height := _world_aabb_height(local_aabb, source.global_transform)
+	if world_height < 0.001:
+		temp.queue_free()
+		return {}
+
+	var scale_factor := desired_height / world_height
+
 	var display := MeshInstance3D.new()
 	display.name = "AdultMushroom"
 	display.mesh = source.mesh
+	display.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for surface_idx in source.mesh.get_surface_count():
 		var surface_mat := source.get_active_material(surface_idx)
 		if surface_mat:
 			display.set_surface_override_material(surface_idx, surface_mat)
 
-	display.global_transform = source.global_transform
-
-	var local_aabb := display.mesh.get_aabb()
-	var world_height := _world_aabb_height(local_aabb, display.global_transform)
-	if world_height < 0.001:
-		display.queue_free()
-		temp.queue_free()
-		return {}
-
-	var scale_factor := desired_height / world_height
-	display.scale *= Vector3.ONE * scale_factor
-
-	var bottom_world := _world_aabb_bottom_center(local_aabb, display.global_transform)
-	display.global_position += anchor.global_position - bottom_world
-
 	temp.queue_free()
+
 	anchor.add_child(display)
+	display.transform = rel_xform
+	display.scale = display.scale * scale_factor
+	_align_bottom_to_world_point(display, local_aabb, anchor.global_position)
+
+	display.force_update_transform()
+	var cap_height := _world_aabb_height(local_aabb, display.global_transform)
 
 	return {
 		"mesh_instance": display,
-		"cap_height": world_height * scale_factor,
+		"cap_height": cap_height,
 	}
+
+
+static func _align_bottom_to_world_point(
+	display: MeshInstance3D,
+	local_aabb: AABB,
+	target_world: Vector3
+) -> void:
+	display.force_update_transform()
+	var bottom_world := _world_aabb_bottom_center(local_aabb, display.global_transform)
+	display.global_position += target_world - bottom_world
 
 
 static func _world_aabb_height(local_aabb: AABB, xform: Transform3D) -> float:

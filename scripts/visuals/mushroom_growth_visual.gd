@@ -24,6 +24,7 @@ var _progress := 0.0
 var _active := false
 var _adult_shown := false
 var _adult_cap_height := 0.8
+var _adult_mesh: MeshInstance3D
 
 @onready var _procedural_root: Node3D = $ProceduralRoot
 @onready var _knot: MeshInstance3D = $ProceduralRoot/HyphalKnot
@@ -59,6 +60,7 @@ func _reset_visuals() -> void:
 	_pin_cap.scale = Vector3(0.06, 0.04, 0.06)
 	_adult_slot.visible = false
 	_adult_slot.scale = Vector3.ONE
+	_adult_mesh = null
 	for child in _adult_slot.get_children():
 		child.queue_free()
 
@@ -155,6 +157,7 @@ func _show_adult_model() -> void:
 	_adult_slot.visible = true
 
 	var display: MeshInstance3D = loaded["mesh_instance"]
+	_adult_mesh = display
 	_adult_cap_height = float(loaded.get("cap_height", adult_height * 0.75))
 
 	var tween := create_tween()
@@ -163,6 +166,13 @@ func _show_adult_model() -> void:
 
 
 func get_cap_position() -> Vector3:
+	if _adult_mesh and is_instance_valid(_adult_mesh) and _adult_mesh.mesh:
+		var aabb := _adult_mesh.mesh.get_aabb()
+		return _adult_mesh.global_transform * Vector3(
+			aabb.get_center().x,
+			aabb.position.y + aabb.size.y,
+			aabb.get_center().z
+		)
 	if _adult_slot.visible:
 		return _adult_slot.global_position + Vector3.UP * _adult_cap_height
 	if _pin_cap.visible:
