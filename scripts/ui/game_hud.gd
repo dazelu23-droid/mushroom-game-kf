@@ -157,11 +157,11 @@ func _update_colonization_bar(percent: float) -> void:
 	if percent >= 80.0:
 		colonization_bar.tooltip_text = "Colonization complete — environmental trigger next"
 	else:
-		colonization_bar.tooltip_text = "Substrate colonization: %.0f%% (need 80%%)" % percent
+		colonization_bar.tooltip_text = "Substrate colonization: %.1f%% (need 80%%)" % percent
 
 
 func _update_stats(nutrients: float, max_nutrients: float, colonization: float) -> void:
-	stats_label.text = "Nutrients: %.0f/%.0f | Colonization: %.0f%%" % [
+	stats_label.text = "Nutrients: %.0f/%.0f | Colonization: %.1f%%" % [
 		nutrients, max_nutrients, colonization,
 	]
 

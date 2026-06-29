@@ -17,6 +17,7 @@ class HyphaTip:
 
 @export var growth_speed: float = 6.2
 @export var max_branches: int = 180
+@export var colonization_target: float = 80.0
 @export var tip_search_range: float = 16.0
 @export var absorb_range: float = 4.5
 @export var branch_chance: float = 0.09
@@ -35,6 +36,7 @@ var _hypha_root: Node3D
 var _tip_glows: Node3D
 var _branch_count := 0
 var _species: Dictionary = {}
+var _tip_glow_pool: Array[MeshInstance3D] = []
 
 
 func _ready() -> void:
@@ -127,15 +129,24 @@ func _physics_process(delta: float) -> void:
 	if growing:
 		if _branch_count < max_branches:
 			_grow_step(delta)
-		elif GameState.colonization_percent < 80.0:
+		elif GameState.colonization_percent < colonization_target:
 			_absorb_from_tips(delta)
 		_update_tip_glows(true)
 	else:
 		_update_tip_glows(false)
 
-	if GameState.colonization_percent >= 80.0 and not _colonization_signaled:
-		_colonization_signaled = true
-		colonization_ready.emit()
+	if GameState.colonization_percent >= colonization_target and not _colonization_signaled:
+		_signal_colonization_ready()
+	elif _branch_count >= max_branches and GameState.colonization_percent >= colonization_target - 1.0:
+		GameState.set_colonization(colonization_target)
+		_signal_colonization_ready()
+
+
+func _signal_colonization_ready() -> void:
+	if _colonization_signaled:
+		return
+	_colonization_signaled = true
+	colonization_ready.emit()
 
 
 func _is_growing() -> bool:
@@ -348,7 +359,7 @@ func _add_hypha_segment(
 
 	_hypha_root.add_child(mesh_instance)
 	_branch_count += 1
-	GameState.add_colonization(clampf(segment_length * 4.8, 0.12, 0.52))
+	GameState.add_colonization(clampf(segment_length * 5.2, 0.15, 0.55))
 	return top_r
 
 
@@ -368,23 +379,35 @@ func _add_hypha_junction(at: Vector3, radius: float) -> void:
 
 
 func _update_tip_glows(show: bool) -> void:
-	_clear_tip_glows()
 	if not show:
+		for glow in _tip_glow_pool:
+			glow.visible = false
 		return
-	for tip in _tips:
+
+	while _tip_glow_pool.size() < _tips.size():
 		var glow := MeshInstance3D.new()
 		var sphere := SphereMesh.new()
-		var glow_r := maxf(tip.radius, 0.012) * 1.15
-		sphere.radius = glow_r
-		sphere.height = glow_r * 2.0
-		sphere.radial_segments = 8
-		sphere.rings = 4
+		sphere.radius = 0.016
+		sphere.height = 0.032
+		sphere.radial_segments = 6
+		sphere.rings = 3
 		glow.mesh = sphere
 		glow.material_override = _tip_glow_material
-		glow.position = tip.position
 		_tip_glows.add_child(glow)
+		_tip_glow_pool.append(glow)
+
+	for i in _tips.size():
+		var tip := _tips[i]
+		var glow := _tip_glow_pool[i]
+		glow.visible = true
+		var glow_r := maxf(tip.radius, 0.012) * 1.15
+		glow.scale = Vector3.ONE * (glow_r / 0.016)
+		glow.position = tip.position
+
+	for i in range(_tips.size(), _tip_glow_pool.size()):
+		_tip_glow_pool[i].visible = false
 
 
 func _clear_tip_glows() -> void:
-	for child in _tip_glows.get_children():
-		child.queue_free()
+	for glow in _tip_glow_pool:
+		glow.visible = false

@@ -18,6 +18,14 @@ var _colonization_advanced := false
 
 
 func _ready() -> void:
+	spore.deactivate()
+	hud.show_objective("Generating forest ecosystem…")
+	await get_tree().process_frame
+	_build_world()
+	_start_gameplay()
+
+
+func _build_world() -> void:
 	var forest := get_node_or_null("Forest") as ForestBuilder
 	if forest:
 		forest.build()
@@ -38,6 +46,9 @@ func _ready() -> void:
 
 	_collect_nutrients()
 	_highlight_compatible_substrates()
+
+
+func _start_gameplay() -> void:
 	_connect_signals()
 	hud.bind_spore(spore)
 	hud.set_landing_ui_visible(true)

@@ -5,16 +5,22 @@ const TREE_SCENE := preload("res://scenes/forest_tree.tscn")
 const TREE_SPORE_FADE_SCRIPT := preload("res://scripts/world/tree_spore_fade.gd")
 
 @export var forest_radius: float = 30.0
-@export var tree_count: int = 95
+@export var tree_count: int = 72
 @export var ground_size: float = 72.0
 
 var _rng := RandomNumberGenerator.new()
 var _height_noise := FastNoiseLite.new()
+var _shared_bark: StandardMaterial3D
+var _shared_rock: StandardMaterial3D
+var _shared_moss: StandardMaterial3D
+var _shared_ground: StandardMaterial3D
+var _shared_leaf_noise: NoiseTexture2D
 
 
 func build() -> void:
 	_rng.randomize()
 	_setup_height_noise()
+	_ensure_shared_materials()
 	_build_ground()
 	_scatter_trees()
 	_build_fallen_logs()
@@ -23,6 +29,16 @@ func build() -> void:
 	_build_ferns()
 	_build_atmosphere_particles()
 	_setup_tree_spore_fade()
+
+
+func _ensure_shared_materials() -> void:
+	if _shared_bark != null:
+		return
+	_shared_leaf_noise = _make_noise_texture(0.22, 3)
+	_shared_bark = _make_bark_material()
+	_shared_rock = _make_rock_material()
+	_shared_moss = _make_moss_material()
+	_shared_ground = _make_ground_material()
 
 
 func _setup_tree_spore_fade() -> void:
@@ -74,8 +90,8 @@ func _make_noise_texture(freq: float, octaves: int) -> NoiseTexture2D:
 	var tex := NoiseTexture2D.new()
 	tex.noise = noise
 	tex.seamless = true
-	tex.width = 1024
-	tex.height = 1024
+	tex.width = 512
+	tex.height = 512
 	return tex
 
 
@@ -124,7 +140,7 @@ func _make_rock_material() -> StandardMaterial3D:
 
 
 func _build_ground() -> void:
-	var subdiv := 64
+	var subdiv := 40
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(ground_size, ground_size)
 	plane.subdivide_width = subdiv
@@ -146,7 +162,7 @@ func _build_ground() -> void:
 	var ground := MeshInstance3D.new()
 	ground.name = "ForestFloor"
 	ground.mesh = mesh
-	ground.material_override = _make_ground_material()
+	ground.material_override = _shared_ground
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(ground)
 
@@ -212,7 +228,7 @@ func _make_log(pos: Vector3, rot: Vector3, length: float) -> Node3D:
 	cyl.radial_segments = 14
 	mesh_inst.mesh = cyl
 	mesh_inst.rotation.z = PI * 0.5
-	mesh_inst.material_override = _make_bark_material()
+	mesh_inst.material_override = _shared_bark
 	mesh_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	root.add_child(mesh_inst)
 
@@ -222,7 +238,7 @@ func _make_log(pos: Vector3, rot: Vector3, length: float) -> Node3D:
 		moss_mesh.size = Vector3(length * 0.5, 0.05, 0.4)
 		moss.mesh = moss_mesh
 		moss.position = Vector3(0, 0.16, 0)
-		moss.material_override = _make_moss_material()
+		moss.material_override = _shared_moss
 		root.add_child(moss)
 
 	return root
@@ -250,7 +266,7 @@ func _build_rocks() -> void:
 			_rng.randf_range(0.5, 0.9),
 			_rng.randf_range(0.8, 1.3)
 		)
-		rock.material_override = _make_rock_material()
+		rock.material_override = _shared_rock
 		rock.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		rocks.add_child(rock)
 
@@ -260,7 +276,7 @@ func _build_understory() -> void:
 	understory.name = "Understory"
 	add_child(understory)
 
-	for i in 42:
+	for i in 30:
 		var angle := _rng.randf_range(0, TAU)
 		var dist := _rng.randf_range(2.0, forest_radius)
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
@@ -297,7 +313,7 @@ func _build_understory() -> void:
 		cyl.radial_segments = 12
 		stump.mesh = cyl
 		stump.position = Vector3(pos.x, pos.y + 0.2, pos.z)
-		stump.material_override = _make_bark_material()
+		stump.material_override = _shared_bark
 		stump.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		understory.add_child(stump)
 
@@ -307,7 +323,7 @@ func _build_ferns() -> void:
 	ferns.name = "Ferns"
 	add_child(ferns)
 
-	for i in 55:
+	for i in 38:
 		var angle := _rng.randf_range(0, TAU)
 		var dist := _rng.randf_range(2.5, forest_radius)
 		var pos := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
@@ -363,8 +379,6 @@ func _build_atmosphere_particles() -> void:
 
 
 func _apply_tree_materials(tree: Node3D) -> void:
-	var bark := _make_bark_material()
-	var leaf_noise := _make_noise_texture(0.22, 3)
 	for child in tree.get_children():
 		if child is MeshInstance3D:
 			var mesh_inst := child as MeshInstance3D
@@ -375,13 +389,12 @@ func _apply_tree_materials(tree: Node3D) -> void:
 					_rng.randf_range(0.28, 0.38),
 					_rng.randf_range(0.08, 0.16)
 				)
-				mat.albedo_texture = leaf_noise
+				mat.albedo_texture = _shared_leaf_noise
 				mat.roughness = 0.84
 				mat.emission_enabled = true
 				mat.emission = mat.albedo_color * 0.12
 				mesh_inst.material_override = mat
 			else:
-				var bark_copy := bark.duplicate() as StandardMaterial3D
-				mesh_inst.material_override = bark_copy
+				mesh_inst.material_override = _shared_bark
 				mesh_inst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 

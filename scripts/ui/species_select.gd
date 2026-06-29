@@ -75,6 +75,9 @@ func _on_species_selected(index: int) -> void:
 
 
 func _on_start_pressed() -> void:
+	start_button.disabled = true
+	start_button.text = "Loading forest…"
+	await get_tree().process_frame
 	var species: Dictionary = MushroomSpeciesData.SPECIES[_selected_index].duplicate()
 	GameState.select_species(species)
 	get_tree().change_scene_to_packed(GAME_SCENE)
