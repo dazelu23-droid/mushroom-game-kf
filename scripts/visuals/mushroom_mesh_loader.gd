@@ -6,7 +6,12 @@ extends RefCounted
 const ADULT_SCENE := preload("res://assets/mushroom/lowpoly_mushrooms.glb")
 
 
-static func create_display(mesh_name: String, desired_height: float, anchor: Node3D) -> Dictionary:
+static func create_display(
+	mesh_name: String,
+	desired_height: float,
+	anchor: Node3D,
+	ground_lift: float = 0.0
+) -> Dictionary:
 	if not anchor.is_inside_tree():
 		return {}
 
@@ -51,7 +56,7 @@ static func create_display(mesh_name: String, desired_height: float, anchor: Nod
 	anchor.add_child(display)
 	display.transform = rel_xform
 	display.scale = display.scale * scale_factor
-	_align_bottom_to_world_point(display, local_aabb, anchor.global_position)
+	_align_bottom_to_world_point(display, local_aabb, anchor.to_global(Vector3(0.0, ground_lift, 0.0)))
 
 	display.force_update_transform()
 	var cap_height := _world_aabb_height(local_aabb, display.global_transform)

@@ -36,10 +36,19 @@ func scatter_near_substrates(substrates: Node3D) -> void:
 			_rng.randf_range(-2.5, 2.5)
 		)
 		var pos := base_pos + offset
-		if Vector2(pos.x, pos.z).length() > scatter_radius:
-			continue
 		var def: Dictionary = NUTRIENT_DEFS[i % NUTRIENT_DEFS.size()]
 		_create_source(pos, def)
+
+
+func add_cluster_near(world_pos: Vector3, count: int = 3) -> void:
+	for i in count:
+		var offset := Vector3(
+			_rng.randf_range(-2.0, 2.0),
+			0.0,
+			_rng.randf_range(-2.0, 2.0)
+		)
+		var def: Dictionary = NUTRIENT_DEFS[i % NUTRIENT_DEFS.size()]
+		_create_source(world_pos + offset, def)
 
 
 func _create_source(world_pos: Vector3, def: Dictionary) -> void:

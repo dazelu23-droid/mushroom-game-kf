@@ -5,6 +5,7 @@ extends Area3D
 @export var substrate_label: String = "Leaf litter"
 
 var _compatible := false
+var _has_colony := false
 var _marker: MeshInstance3D
 
 
@@ -18,6 +19,25 @@ func _ready() -> void:
 
 func get_substrate_type() -> String:
 	return substrate_type
+
+
+func has_colony() -> bool:
+	return _has_colony
+
+
+func claim_colony() -> bool:
+	if _has_colony:
+		return false
+	_has_colony = true
+	if is_node_ready():
+		_update_highlight()
+	return true
+
+
+func release_colony() -> void:
+	_has_colony = false
+	if is_node_ready():
+		_update_highlight()
 
 
 func set_compatible(compatible: bool) -> void:
@@ -111,10 +131,15 @@ func _update_highlight() -> void:
 	if _marker == null:
 		_build_marker()
 	if _marker:
-		_marker.visible = _compatible
+		var show_ring := _compatible and not _has_colony
+		_marker.visible = show_ring
 		var center := _marker.get_node_or_null("MarkerCenter") as MeshInstance3D
 		if center:
-			center.visible = _compatible
+			center.visible = show_ring
+		if _has_colony and _compatible:
+			var mat := _marker.material_override as StandardMaterial3D
+			if mat:
+				mat.albedo_color = Color(0.55, 0.45, 0.28, 0.5)
 
 
 func _on_body_entered(_body: Node3D) -> void:

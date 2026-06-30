@@ -259,11 +259,13 @@ func _add_hypha_mesh(start: Vector3, end: Vector3, start_radius: float, overlap_
 	var mid := (start + end) * 0.5
 	mesh_instance.position = mid
 	if dir.length_squared() > 0.0001:
+		var y_axis := dir.normalized()
 		var up := Vector3.UP
-		if absf(dir.dot(up)) > 0.98:
+		if absf(y_axis.dot(up)) > 0.98:
 			up = Vector3.RIGHT
-		mesh_instance.look_at(mid + dir, up)
-		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+		var x_axis := up.cross(y_axis).normalized()
+		var z_axis := x_axis.cross(y_axis).normalized()
+		mesh_instance.basis = Basis(x_axis, y_axis, z_axis)
 	_germ_root.add_child(mesh_instance)
 	_add_hypha_junction(end, top_radius * 0.95)
 	return top_radius

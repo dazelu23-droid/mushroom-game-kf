@@ -20,6 +20,7 @@ func _ready() -> void:
 	GameState.fact_updated.connect(_on_fact_updated)
 	GameState.nutrients_changed.connect(_on_nutrients_changed)
 	GameState.colonization_changed.connect(_on_colonization_changed)
+	GameState.colonies_changed.connect(_on_colonies_changed)
 	_update_species()
 	land_button.visible = false
 	land_button.pressed.connect(_on_land_pressed)
@@ -110,6 +111,16 @@ func update_environment(humidity: float, co2: float) -> void:
 	env_label.text = "Humidity: %.0f%% | CO₂: %.0f%%" % [humidity, co2]
 
 
+func set_explore_controls_visible(_show: bool) -> void:
+	pass
+
+
+func show_spectate_target(label: String, index: int, total: int) -> void:
+	if label.is_empty():
+		return
+	stats_label.text = "Spectating (%d/%d): %s" % [index, total, label]
+
+
 func _on_phase_changed(phase: LifeCycle.Phase) -> void:
 	var info: Dictionary = LifeCycle.PHASE_FACTS[phase]
 	phase_label.text = String(info.get("title", ""))
@@ -128,6 +139,10 @@ func _update_controls_hint(phase: LifeCycle.Phase) -> void:
 			controls_hint.text = "Hold SPACE or toggle Grow button | Tips seek digestible nutrients | 80% to fruit"
 		LifeCycle.Phase.ENVIRONMENTAL_TRIGGER:
 			controls_hint.text = "H raise humidity | V ventilate CO₂ | Need >85% humidity, <40% CO₂"
+		LifeCycle.Phase.FRUITING_BODY_GROWTH:
+			controls_hint.text = "Tab/Q spectate wild mushrooms | Right-click orbit | Scroll zoom"
+		LifeCycle.Phase.SPORE_PRODUCTION, LifeCycle.Phase.COMPLETE:
+			controls_hint.text = "Tab/Q spectate | Right-drag pan | Shift+right orbit | Scroll zoom | F freecam | Esc exit freecam"
 		_:
 			controls_hint.text = "Right-click orbit camera | Scroll zoom"
 
@@ -145,6 +160,10 @@ func _on_colonization_changed(percent: float) -> void:
 	_update_colonization_bar(percent)
 
 
+func _on_colonies_changed(_spawned: int, _mature: int) -> void:
+	_update_stats(GameState.nutrients, GameState.max_nutrients, GameState.colonization_percent)
+
+
 func _refresh_colonization_display() -> void:
 	var show_bar := GameState.current_phase == LifeCycle.Phase.MYCELIUM_COLONIZATION
 	colonization_bar.visible = show_bar
@@ -156,14 +175,29 @@ func _update_colonization_bar(percent: float) -> void:
 	colonization_bar.value = percent
 	if percent >= 80.0:
 		colonization_bar.tooltip_text = "Colonization complete — environmental trigger next"
+	elif percent >= 65.0:
+		colonization_bar.tooltip_text = "Substrate colonization: %.1f%% — network maturing toward 80%%" % percent
 	else:
 		colonization_bar.tooltip_text = "Substrate colonization: %.1f%% (need 80%%)" % percent
+	if GameState.current_phase == LifeCycle.Phase.MYCELIUM_COLONIZATION:
+		if percent >= 65.0 and percent < 80.0:
+			controls_hint.text = "Hyphal network spreading — hold SPACE near nutrients or wait for maturation"
+		elif percent < 65.0:
+			controls_hint.text = "Hold SPACE or toggle Grow button | Tips seek digestible nutrients | 80% to fruit"
 
 
 func _update_stats(nutrients: float, max_nutrients: float, colonization: float) -> void:
-	stats_label.text = "Nutrients: %.0f/%.0f | Colonization: %.1f%%" % [
-		nutrients, max_nutrients, colonization,
-	]
+	var phase := GameState.current_phase
+	if phase == LifeCycle.Phase.SPORE_PRODUCTION or phase == LifeCycle.Phase.COMPLETE:
+		stats_label.text = "Colonies: %d spawned | %d fruiting | Spores: %d" % [
+			GameState.spawned_colonies,
+			GameState.mature_colonies,
+			GameState.spores_released,
+		]
+	else:
+		stats_label.text = "Nutrients: %.0f/%.0f | Colonization: %.1f%%" % [
+			nutrients, max_nutrients, colonization,
+		]
 
 
 func _on_menu_pressed() -> void:

@@ -135,19 +135,19 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var growing := _is_growing()
-	if growing:
-		if _branch_count < max_branches:
-			_grow_step(delta)
-		elif GameState.colonization_percent < colonization_target:
-			_absorb_from_tips(delta)
-		_update_tip_glows(true)
-	else:
-		_update_tip_glows(false)
+	var network_full := _branch_count >= max_branches
+
+	if growing and not network_full:
+		_grow_step(delta)
+	elif GameState.colonization_percent < colonization_target:
+		_absorb_from_tips(delta)
+
+	if network_full:
+		_mature_colonization(delta)
+
+	_update_tip_glows(growing or network_full)
 
 	if GameState.colonization_percent >= colonization_target and not _colonization_signaled:
-		_signal_colonization_ready()
-	elif _branch_count >= max_branches and GameState.colonization_percent >= colonization_target - 1.0:
-		GameState.set_colonization(colonization_target)
 		_signal_colonization_ready()
 
 
@@ -360,8 +360,20 @@ func _add_hypha_segment(
 	_try_anastomosis(end, top_r)
 
 	_branch_count += 1
-	GameState.add_colonization(clampf(segment_length * 5.2, 0.15, 0.55))
+	GameState.add_colonization(_colonization_for_segment(segment_length))
 	return top_r
+
+
+func _colonization_for_segment(segment_length: float) -> float:
+	var per_branch := colonization_target / float(max_branches)
+	return per_branch * clampf(segment_length / 0.09, 0.7, 1.15)
+
+
+func _mature_colonization(delta: float) -> void:
+	if GameState.colonization_percent >= colonization_target:
+		return
+	var remaining := colonization_target - GameState.colonization_percent
+	GameState.add_colonization(remaining * minf(delta * 0.45, 0.12))
 
 
 func _add_hypha_cylinder(
@@ -387,14 +399,15 @@ func _add_hypha_cylinder(
 
 	var mid := (start + end) * 0.5
 	mesh_instance.position = mid
-	if dir.length_squared() > 0.0001:
-		var up := Vector3.UP
-		if absf(dir.dot(up)) > 0.98:
-			up = Vector3.RIGHT
-		mesh_instance.look_at(mid + dir, up)
-		mesh_instance.rotate_object_local(Vector3.RIGHT, PI * 0.5)
-
 	_hypha_root.add_child(mesh_instance)
+	if dir.length_squared() > 0.0001:
+		var y_axis := dir.normalized()
+		var up := Vector3.UP
+		if absf(y_axis.dot(up)) > 0.98:
+			up = Vector3.RIGHT
+		var x_axis := up.cross(y_axis).normalized()
+		var z_axis := x_axis.cross(y_axis).normalized()
+		mesh_instance.basis = Basis(x_axis, y_axis, z_axis)
 
 
 func _register_network_point(at: Vector3, radius: float) -> void:

@@ -15,13 +15,28 @@ var _nutrient_sources: Array[NutrientSource] = []
 var _environment_timer := 0.0
 var _fruiting_started := false
 var _colonization_advanced := false
+var _dispersal: Node3D
+var _spectator: Node
+var _wild_mushrooms: Node3D
+var _explore_controls := false
+var _spectate_enabled := false
 
 
 func _ready() -> void:
 	spore.deactivate()
+	_dispersal = SporeDispersalManager.new()
+	_dispersal.name = "SporeDispersal"
+	add_child(_dispersal)
+	_spectator = MushroomSpectator.new()
+	_spectator.name = "MushroomSpectator"
+	add_child(_spectator)
+	_wild_mushrooms = WildMushroomScatter.new()
+	_wild_mushrooms.name = "WildMushrooms"
+	add_child(_wild_mushrooms)
 	hud.show_objective("Generating forest ecosystem…")
 	await get_tree().process_frame
 	_build_world()
+	_spectator.setup(world_camera)
 	_start_gameplay()
 
 
@@ -46,9 +61,13 @@ func _build_world() -> void:
 
 	_collect_nutrients()
 	_highlight_compatible_substrates()
+	var player_id: String = GameState.selected_species.get("id", "")
+	_wild_mushrooms.scatter(substrates, player_id)
+	_spectator.refresh_targets()
 
 
 func _start_gameplay() -> void:
+	_dispersal.setup(growth, GameState.selected_species)
 	_connect_signals()
 	hud.bind_spore(spore)
 	hud.set_landing_ui_visible(true)
@@ -62,8 +81,12 @@ func _start_gameplay() -> void:
 func _collect_nutrients() -> void:
 	_nutrient_sources.clear()
 	for node in nutrients.find_children("*", "Area3D", true, false):
-		if node is NutrientSource:                  
+		if node is NutrientSource:
 			_nutrient_sources.append(node as NutrientSource)
+
+
+func refresh_nutrient_sources() -> void:
+	_collect_nutrients()
 
 
 func _highlight_compatible_substrates() -> void:
@@ -81,6 +104,8 @@ func _connect_signals() -> void:
 	mycelium.colonization_ready.connect(_on_colonization_ready)
 	growth.growth_complete.connect(_on_growth_complete)
 	spore_release.cycle_complete.connect(_on_cycle_complete)
+	_dispersal.colony_spawned.connect(_on_colony_spawned)
+	_spectator.target_changed.connect(_on_spectate_target_changed)
 	GameState.phase_changed.connect(_on_phase_changed)
 
 
@@ -88,6 +113,19 @@ func _process(delta: float) -> void:
 	if GameState.current_phase == LifeCycle.Phase.ENVIRONMENTAL_TRIGGER:
 		_environment_timer += delta
 		_process_environmental_trigger(delta)
+	if _spectate_enabled:
+		_handle_spectate_input()
+
+
+func _handle_spectate_input() -> void:
+	if world_camera and world_camera.is_freecam():
+		return
+	if Input.is_action_just_pressed("spectate_next"):
+		_spectator.refresh_targets()
+		_spectator.cycle_next()
+	elif Input.is_action_just_pressed("spectate_prev"):
+		_spectator.refresh_targets()
+		_spectator.cycle_prev()
 
 
 func _on_spore_landed(_pos: Vector3, substrate_type: String) -> void:
@@ -97,6 +135,7 @@ func _on_spore_landed(_pos: Vector3, substrate_type: String) -> void:
 		return
 	hud.set_landing_ui_visible(false)
 	GameState.set_phase(LifeCycle.Phase.GERMINATION)
+	_dispersal.claim_patch_near(spore.global_position)
 	var spore_cam := get_node_or_null("SporeCamera") as OrbitCamera
 	if spore_cam:
 		spore_cam.set_follow_enabled(false)
@@ -111,6 +150,10 @@ func _on_spore_landed(_pos: Vector3, substrate_type: String) -> void:
 
 func _on_germination_complete() -> void:
 	GameState.set_phase(LifeCycle.Phase.MYCELIUM_COLONIZATION)
+	var nutrient_scatter := nutrients as NutrientScatter
+	if nutrient_scatter:
+		nutrient_scatter.add_cluster_near(GameState.landing_position, 3)
+	refresh_nutrient_sources()
 	mycelium.setup(GameState.landing_position, _nutrient_sources)
 	mycelium.activate()
 	var spore_cam := get_node_or_null("SporeCamera") as OrbitCamera
@@ -170,21 +213,57 @@ func _begin_fruiting() -> void:
 	GameState.set_phase(LifeCycle.Phase.FRUITING_BODY_GROWTH)
 	growth.setup(GameState.landing_position)
 	growth.activate()
-	hud.show_objective("Watch bi-phasic growth: primordium → stipe elongation → cap expansion → mature fruiting body.")
+	growth.register_spectate_target()
+	_spectate_enabled = true
+	_spectator.refresh_targets()
+	_spectator.enable()
+	hud.show_objective("Watch bi-phasic growth: primordium → stipe elongation → cap expansion → mature fruiting body. Tab/Q spectate other mushrooms.")
 
 
 func _on_growth_complete() -> void:
 	GameState.set_phase(LifeCycle.Phase.SPORE_PRODUCTION)
+	_enable_explore_camera()
 	spore_release.activate()
-	hud.show_objective("Basidiospores discharging from gills. Meiosis complete — life cycle renewing.")
+	_dispersal.register_release_source(Callable(growth, "get_cap_position"), spore_release.release_duration)
+	hud.show_objective(
+		"Basidiospores discharging — watch them land on ring-marked patches and multiply into new %s colonies."
+		% GameState.selected_species.get("common_name", "mushroom")
+	)
+
+
+func _on_colony_spawned(total: int) -> void:
+	_spectator.refresh_targets()
+	hud.show_objective(
+		"Spores colonized %d new patch%s! Each will grow into %s and release more spores."
+		% [total, "es" if total != 1 else "", GameState.selected_species.get("common_name", "mushroom")]
+	)
 
 
 func _on_cycle_complete() -> void:
 	GameState.set_phase(LifeCycle.Phase.COMPLETE)
-	hud.show_objective("Life cycle complete! %s released ~%d spores. Return to menu to try another species." % [
-		GameState.selected_species.get("common_name", "Mushroom"),
-		GameState.spores_released,
-	])
+	_enable_explore_camera()
+	hud.show_objective(
+		"Life cycle complete! ~%d spores released, %d new colonies spawned (%d fruiting). "
+		+ "Tab/Q spectate mushrooms | Right-drag pan | Shift+right-drag orbit | F freecam."
+		% [GameState.spores_released, GameState.spawned_colonies, GameState.mature_colonies]
+	)
+
+
+func _enable_explore_camera() -> void:
+	_explore_controls = true
+	_spectate_enabled = true
+	if world_camera:
+		world_camera.set_follow_enabled(true)
+		world_camera.current = true
+		world_camera.set_explore_mode(true)
+		world_camera.set_focus_point(growth.global_position)
+		world_camera.follow_distance = 14.0
+	_spectator.enable()
+	hud.set_explore_controls_visible(true)
+
+
+func _on_spectate_target_changed(label: String, index: int, total: int) -> void:
+	hud.show_spectate_target(label, index, total)
 
 
 func _on_phase_changed(_phase: LifeCycle.Phase) -> void:

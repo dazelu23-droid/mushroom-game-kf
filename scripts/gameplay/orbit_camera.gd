@@ -1,6 +1,8 @@
 extends Camera3D
 class_name OrbitCamera
 
+enum Mode { ORBIT, FREECAM }
+
 @export var target_path: NodePath
 @export var follow_distance: float = 14.0
 @export var min_distance: float = 6.0
@@ -11,15 +13,24 @@ class_name OrbitCamera
 @export var wheel_zoom_speed: float = 1.5
 @export var focus_height_offset: float = 0.35
 @export var follow_enabled_on_start: bool = true
+@export var freecam_speed: float = 10.0
+@export var freecam_fast_multiplier: float = 2.2
+@export var pan_sensitivity: float = 0.014
+@export var focus_lerp_speed: float = 5.5
 
 var _yaw_deg: float = 0.0
 var _pitch_deg: float = -28.0
 var _dragging := false
 var _target: Node3D = null
 var _follow_enabled := true
-
+var _mode := Mode.ORBIT
+var _explore_mode := false
+var _freecam_pitch := 0.0
+var _freecam_yaw := 0.0
 var _focus_point: Vector3 = Vector3.ZERO
+var _focus_goal: Vector3 = Vector3.ZERO
 var _use_focus_point := false
+var _lerp_focus := false
 
 
 func _ready() -> void:
@@ -36,11 +47,34 @@ func set_target(node: Node3D) -> void:
 
 func set_focus_point(point: Vector3) -> void:
 	_focus_point = point
+	_focus_goal = point
 	_use_focus_point = true
+	_lerp_focus = false
+
+
+func focus_on_point(point: Vector3) -> void:
+	_focus_goal = point
+	_use_focus_point = true
+	_lerp_focus = true
 
 
 func set_follow_enabled(enabled: bool) -> void:
 	_follow_enabled = enabled
+
+
+func set_explore_mode(enabled: bool) -> void:
+	_explore_mode = enabled
+
+
+func is_freecam() -> bool:
+	return _mode == Mode.FREECAM
+
+
+func toggle_freecam() -> void:
+	if _mode == Mode.FREECAM:
+		_exit_freecam()
+	else:
+		_enter_freecam()
 
 
 func get_flat_forward() -> Vector3:
@@ -59,8 +93,45 @@ func get_flat_right() -> Vector3:
 	return right.normalized()
 
 
+func _enter_freecam() -> void:
+	_mode = Mode.FREECAM
+	_dragging = false
+	_freecam_yaw = rotation.y
+	_freecam_pitch = rotation.x
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _exit_freecam() -> void:
+	_mode = Mode.ORBIT
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_sync_orbit_angles_from_transform()
+	_update_transform()
+
+
+func _sync_orbit_angles_from_transform() -> void:
+	var focus := _get_focus()
+	var offset := global_position - focus
+	if offset.length_squared() < 0.0001:
+		return
+	follow_distance = offset.length()
+	_pitch_deg = rad_to_deg(asin(clampf(offset.y / follow_distance, -1.0, 1.0)))
+	_yaw_deg = rad_to_deg(atan2(offset.x, offset.z))
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if not _follow_enabled or not current:
+	if not current:
+		return
+
+	if event.is_action_pressed("toggle_freecam"):
+		if _explore_mode or _mode == Mode.FREECAM:
+			toggle_freecam()
+		return
+
+	if _mode == Mode.FREECAM:
+		_handle_freecam_input(event)
+		return
+
+	if not _follow_enabled:
 		return
 
 	if event is InputEventMouseButton:
@@ -75,15 +146,70 @@ func _unhandled_input(event: InputEvent) -> void:
 			_update_transform()
 	elif event is InputEventMouseMotion and _dragging:
 		var motion := event as InputEventMouseMotion
-		_yaw_deg -= motion.relative.x * mouse_sensitivity
-		_pitch_deg = clampf(_pitch_deg - motion.relative.y * mouse_sensitivity, min_pitch, max_pitch)
+		if _explore_mode and not Input.is_key_pressed(KEY_SHIFT):
+			_pan_focus(motion.relative)
+		else:
+			_yaw_deg -= motion.relative.x * mouse_sensitivity
+			_pitch_deg = clampf(_pitch_deg - motion.relative.y * mouse_sensitivity, min_pitch, max_pitch)
 		_update_transform()
 
 
-func _process(_delta: float) -> void:
-	if not _follow_enabled or not current:
+func _handle_freecam_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.is_action_pressed("ui_cancel"):
+		_exit_freecam()
+	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		var motion := event as InputEventMouseMotion
+		_freecam_yaw -= motion.relative.x * 0.003
+		_freecam_pitch = clampf(_freecam_pitch - motion.relative.y * 0.003, -1.4, 1.4)
+		rotation = Vector3(_freecam_pitch, _freecam_yaw, 0.0)
+
+
+func _pan_focus(relative: Vector2) -> void:
+	var pan_scale := follow_distance * pan_sensitivity
+	_focus_point -= get_flat_right() * relative.x * pan_scale
+	_focus_point -= get_flat_forward() * relative.y * pan_scale
+	_focus_goal = _focus_point
+	_lerp_focus = false
+	_use_focus_point = true
+
+
+func _process(delta: float) -> void:
+	if not current:
 		return
+	if _mode == Mode.FREECAM:
+		_process_freecam(delta)
+		return
+	if not _follow_enabled:
+		return
+	if _lerp_focus:
+		_focus_point = _focus_point.lerp(_focus_goal, clampf(delta * focus_lerp_speed, 0.0, 1.0))
+		if _focus_point.distance_to(_focus_goal) < 0.08:
+			_focus_point = _focus_goal
+			_lerp_focus = false
 	_update_transform()
+
+
+func _process_freecam(delta: float) -> void:
+	var move := Vector3.ZERO
+	if Input.is_action_pressed("move_forward"):
+		move -= transform.basis.z
+	if Input.is_action_pressed("move_back"):
+		move += transform.basis.z
+	if Input.is_action_pressed("move_left"):
+		move -= transform.basis.x
+	if Input.is_action_pressed("move_right"):
+		move += transform.basis.x
+	if Input.is_key_pressed(KEY_SPACE):
+		move += Vector3.UP
+	if Input.is_key_pressed(KEY_C):
+		move -= Vector3.UP
+	if move.length_squared() < 0.0001:
+		return
+	move = move.normalized()
+	var speed := freecam_speed
+	if Input.is_key_pressed(KEY_SHIFT):
+		speed *= freecam_fast_multiplier
+	global_position += move * speed * delta
 
 
 func _get_focus() -> Vector3:

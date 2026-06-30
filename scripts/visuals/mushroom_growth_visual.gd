@@ -8,7 +8,17 @@ signal growth_complete
 
 const MushroomMeshLoader := preload("res://scripts/visuals/mushroom_mesh_loader.gd")
 
-@export var adult_height: float = 1.2
+@export var adult_height_scale: float = 1.0
+@export var ground_clearance: float = 0.06
+@export var spawned_colony_speed_scale: float = 3.0
+@export var spawned_colony_spore_duration: float = 5.0
+
+const _FINAL_STIPE_SCALE_Y := 0.45
+const _FINAL_STIPE_POS_Y := 0.05
+const _FINAL_STIPE_MESH_H := 1.0
+const _FINAL_CAP_POS_OFFSET := 0.04
+const _FINAL_CAP_SCALE_Y := 0.12
+const _FINAL_CAP_MESH_H := 0.35
 
 enum GrowthStage {
 	HYPHAL_KNOT,
@@ -25,6 +35,10 @@ var _active := false
 var _adult_shown := false
 var _adult_cap_height := 0.8
 var _adult_mesh: MeshInstance3D
+var _species_override: Dictionary = {}
+var _growth_speed_scale: float = 1.0
+var _is_spawned_colony := false
+var _substrate_patch: SubstratePatch
 
 @onready var _procedural_root: Node3D = $ProceduralRoot
 @onready var _knot: MeshInstance3D = $ProceduralRoot/HyphalKnot
@@ -39,12 +53,33 @@ func setup(origin: Vector3) -> void:
 	_reset_visuals()
 
 
+func setup_colony(
+	origin: Vector3,
+	species: Dictionary,
+	patch: SubstratePatch = null,
+	speed_scale: float = -1.0
+) -> void:
+	_species_override = species.duplicate()
+	_is_spawned_colony = true
+	_substrate_patch = patch
+	_growth_speed_scale = speed_scale if speed_scale > 0.0 else spawned_colony_speed_scale
+	if patch and not patch.has_colony():
+		patch.claim_colony()
+	setup(origin)
+	activate()
+
+
 func activate() -> void:
 	_active = true
 	visible = true
 	_stage = GrowthStage.HYPHAL_KNOT
 	_progress = 0.0
 	_reset_visuals()
+	register_spectate_target()
+
+
+func is_growing() -> bool:
+	return _active
 
 
 func _reset_visuals() -> void:
@@ -65,18 +100,25 @@ func _reset_visuals() -> void:
 		child.queue_free()
 
 
+func _get_species() -> Dictionary:
+	if not _species_override.is_empty():
+		return _species_override
+	return GameState.selected_species
+
+
 func _process(delta: float) -> void:
 	if not _active:
 		return
 
-	var species: Dictionary = GameState.selected_species
+	var species: Dictionary = _get_species()
 	if species.is_empty():
 		return
 	var fruit_days_vec: Vector2 = MushroomSpeciesData.get_vector2(species, "fruiting_days", Vector2(7.0, 14.0))
 	var fruit_days: float = (fruit_days_vec.x + fruit_days_vec.y) * 0.5
-	var speed: float = delta / maxf(fruit_days * 0.15, 4.0)
+	var speed: float = delta / maxf(fruit_days * 0.15, 4.0) * _growth_speed_scale
 	_progress += speed
-	GameState.growth_progress = _progress
+	if not _is_spawned_colony:
+		GameState.growth_progress = _progress
 
 	match _stage:
 		GrowthStage.HYPHAL_KNOT:
@@ -145,11 +187,27 @@ func _animate_cap_expansion() -> void:
 		_progress = 0.0
 
 
+func _get_mature_procedural_metrics() -> Dictionary:
+	var stipe_bottom := _FINAL_STIPE_POS_Y - _FINAL_STIPE_MESH_H * _FINAL_STIPE_SCALE_Y * 0.5
+	var cap_pos_y := _FINAL_STIPE_SCALE_Y * 0.5 + _FINAL_CAP_POS_OFFSET
+	var cap_top := cap_pos_y + _FINAL_CAP_MESH_H * _FINAL_CAP_SCALE_Y * 0.5
+	return {
+		"height": cap_top - stipe_bottom,
+		"ground_lift": maxf(-stipe_bottom, 0.0),
+	}
+
+
 func _show_adult_model() -> void:
-	var mesh_name: String = GameState.selected_species.get("mesh_name", "mushroom_01")
-	var loaded: Dictionary = MushroomMeshLoader.create_display(mesh_name, adult_height, _adult_slot)
+	var mesh_name: String = _get_species().get("mesh_name", "mushroom_01")
+	var metrics: Dictionary = _get_mature_procedural_metrics()
+	var target_height: float = float(metrics["height"]) * adult_height_scale
+	var ground_lift: float = float(metrics["ground_lift"]) + ground_clearance
+	var loaded: Dictionary = MushroomMeshLoader.create_display(
+		mesh_name, target_height, _adult_slot, ground_lift
+	)
 	if loaded.is_empty():
-		push_warning("Adult mushroom: mesh '%s' could not be loaded." % mesh_name)
+		push_warning("Adult mushroom: mesh '%s' could not be loaded; keeping procedural model." % mesh_name)
+		_adult_shown = true
 		return
 
 	_adult_shown = true
@@ -158,7 +216,7 @@ func _show_adult_model() -> void:
 
 	var display: MeshInstance3D = loaded["mesh_instance"]
 	_adult_mesh = display
-	_adult_cap_height = float(loaded.get("cap_height", adult_height * 0.75))
+	_adult_cap_height = float(loaded.get("cap_height", target_height * 0.75))
 
 	var tween := create_tween()
 	_adult_slot.scale = Vector3.ONE * 0.01
@@ -178,3 +236,17 @@ func get_cap_position() -> Vector3:
 	if _pin_cap.visible:
 		return _pin_cap.global_position
 	return global_position + Vector3.UP * 0.2
+
+
+func get_spectate_label() -> String:
+	var prefix := "Growing " if _active else ""
+	return "%s%s" % [prefix, _get_species().get("common_name", "Mushroom")]
+
+
+func get_spectate_focus() -> Vector3:
+	return get_cap_position()
+
+
+func register_spectate_target() -> void:
+	if not is_in_group("spectate_target"):
+		add_to_group("spectate_target")

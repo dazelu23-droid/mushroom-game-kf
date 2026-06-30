@@ -3,6 +3,7 @@ extends Node3D
 class_name SporeRelease
 
 signal cycle_complete
+signal release_tick(origin: Vector3)
 
 @export var release_duration: float = 8.0
 
@@ -33,6 +34,7 @@ func _process(delta: float) -> void:
 	GameState.spores_released += int(_spore_rate * delta)
 	if _growth:
 		_particles.global_position = _growth.get_cap_position()
+		release_tick.emit(_particles.global_position)
 
 	if _timer >= release_duration:
 		_active = false

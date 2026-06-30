@@ -4,6 +4,7 @@ signal phase_changed(phase: LifeCycle.Phase)
 signal nutrients_changed(amount: float, max_amount: float)
 signal colonization_changed(percent: float)
 signal fact_updated(title: String, fact: String)
+signal colonies_changed(spawned: int, mature: int)
 
 var selected_species: Dictionary = {}
 var current_phase: LifeCycle.Phase = LifeCycle.Phase.SPORE_DISPERSAL
@@ -21,6 +22,8 @@ var temperature_c: float = 18.0
 
 var growth_progress: float = 0.0
 var spores_released: int = 0
+var spawned_colonies: int = 0
+var mature_colonies: int = 0
 
 
 func select_species(species: Dictionary) -> void:
@@ -40,6 +43,8 @@ func reset_run() -> void:
 	temperature_c = 18.0
 	growth_progress = 0.0
 	spores_released = 0
+	spawned_colonies = 0
+	mature_colonies = 0
 	_emit_phase()
 
 
@@ -60,6 +65,12 @@ func add_colonization(amount: float) -> void:
 func set_colonization(percent: float) -> void:
 	colonization_percent = clampf(percent, 0.0, 100.0)
 	colonization_changed.emit(colonization_percent)
+
+
+func set_colony_counts(spawned: int, mature: int) -> void:
+	spawned_colonies = maxi(spawned, 0)
+	mature_colonies = maxi(mature, 0)
+	colonies_changed.emit(spawned_colonies, mature_colonies)
 
 
 func _emit_phase() -> void:
