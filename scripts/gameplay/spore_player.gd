@@ -18,6 +18,7 @@ var _germination_timer := 0.0
 var _landing_in_progress := false
 var _landing_target := Vector3.ZERO
 var _pending_substrate_type := ""
+var _pending_landing_patch: SubstratePatch
 var _can_land := false
 var _over_compatible := false
 const GERMINATION_TIME := 4.0
@@ -90,6 +91,7 @@ func activate() -> void:
 	_landing_in_progress = false
 	_germ_segment_count = 0
 	_main_germ_tip = Vector3.ZERO
+	_pending_landing_patch = null
 	_clear_germination_visuals()
 	position = Vector3(randf_range(-4.0, 4.0), float_altitude, randf_range(-4.0, 4.0))
 	visible = true
@@ -120,11 +122,11 @@ func request_land() -> void:
 	if patch == null:
 		return
 	_landing_in_progress = true
-	_landing_target = Vector3(
-		position.x,
-		patch.global_position.y + 0.12,
-		position.z
-	)
+	_pending_landing_patch = patch
+	_landing_target = patch.get_landing_position()
+	if not patch.is_tree_mounted():
+		_landing_target.x = position.x
+		_landing_target.z = position.z
 	_pending_substrate_type = patch.get_substrate_type()
 
 
@@ -175,9 +177,13 @@ func _update_germination_visuals(progress: float) -> void:
 		mat.albedo_color = Color(0.95, 0.92, 0.7).lerp(Color(0.98, 0.96, 0.88), progress)
 		mat.emission_energy_multiplier = lerpf(1.5, 0.6, progress)
 
-	if progress > 0.18:
+	if progress > 0.18 and not _is_tree_landing():
 		_ensure_germ_root()
 		_grow_germination_hyphae(progress)
+
+
+func _is_tree_landing() -> bool:
+	return _pending_landing_patch != null and _pending_landing_patch.is_tree_mounted()
 
 
 func _ensure_germ_root() -> void:
@@ -335,6 +341,7 @@ func _try_land(substrate_type: String) -> void:
 		_landed = true
 		GameState.landing_position = position
 		GameState.landing_substrate = substrate_type
+		GameState.landing_patch = _pending_landing_patch
 		var germ_temp: Vector2 = MushroomSpeciesData.get_vector2(species, "germination_temp_c", Vector2(10.0, 24.0))
 		GameState.temperature_c = randf_range(germ_temp.x, germ_temp.y)
 		_reset_spore_material()

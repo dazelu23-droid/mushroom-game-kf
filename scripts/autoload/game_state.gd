@@ -11,6 +11,7 @@ var current_phase: LifeCycle.Phase = LifeCycle.Phase.SPORE_DISPERSAL
 
 var landing_position: Vector3 = Vector3.ZERO
 var landing_substrate: String = ""
+var landing_patch: SubstratePatch
 
 var nutrients: float = 0.0
 var max_nutrients: float = 100.0
@@ -35,6 +36,7 @@ func reset_run() -> void:
 	current_phase = LifeCycle.Phase.SPORE_DISPERSAL
 	landing_position = Vector3.ZERO
 	landing_substrate = ""
+	landing_patch = null
 	nutrients = 0.0
 	max_nutrients = 100.0
 	colonization_percent = 0.0

@@ -4,6 +4,7 @@ extends Node3D
 signal colony_spawned(total: int)
 
 const AirborneSpore := preload("res://scripts/gameplay/airborne_spore.gd")
+const GROWTH_SCENE := preload("res://scenes/mushroom_growth.tscn")
 
 @export var max_colonies: int = 14
 @export var release_interval: float = 0.75
@@ -108,12 +109,12 @@ func _on_spore_arrived(patch: SubstratePatch) -> void:
 
 
 func _spawn_colony(patch: SubstratePatch) -> void:
-	if _growth_template == null:
+	var colony := GROWTH_SCENE.instantiate() as MushroomGrowthVisual
+	if colony == null:
 		patch.release_colony()
 		return
-	var colony := _growth_template.duplicate(Node.DUPLICATE_USE_INSTANTIATION | Node.DUPLICATE_SIGNALS) as MushroomGrowthVisual
 	_colony_root.add_child(colony)
-	var land_pos := Vector3(patch.global_position.x, patch.global_position.y + 0.08, patch.global_position.z)
+	var land_pos := patch.get_landing_position()
 	colony.setup_colony(land_pos, _species, patch, colony_growth_speed_scale)
 	colony.register_spectate_target()
 	colony.growth_complete.connect(_on_colony_matured.bind(colony))

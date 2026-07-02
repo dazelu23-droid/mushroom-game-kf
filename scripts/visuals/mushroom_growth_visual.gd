@@ -48,8 +48,13 @@ var _substrate_patch: SubstratePatch
 @onready var _adult_slot: Node3D = $AdultSlot
 
 
-func setup(origin: Vector3) -> void:
-	global_position = origin
+func setup(origin: Vector3, patch: SubstratePatch = null) -> void:
+	_substrate_patch = patch
+	if patch and patch.is_tree_mounted():
+		var basis := patch.get_fruiting_basis(_get_species())
+		global_transform = Transform3D(basis, patch.get_landing_position())
+	else:
+		global_position = origin
 	_reset_visuals()
 
 
@@ -65,7 +70,10 @@ func setup_colony(
 	_growth_speed_scale = speed_scale if speed_scale > 0.0 else spawned_colony_speed_scale
 	if patch and not patch.has_colony():
 		patch.claim_colony()
-	setup(origin)
+	if patch and patch.is_tree_mounted():
+		setup(origin, patch)
+	else:
+		setup(origin)
 	activate()
 
 
@@ -75,7 +83,8 @@ func activate() -> void:
 	_stage = GrowthStage.HYPHAL_KNOT
 	_progress = 0.0
 	_reset_visuals()
-	register_spectate_target()
+	if _is_spawned_colony:
+		register_spectate_target()
 
 
 func is_growing() -> bool:
@@ -134,6 +143,8 @@ func _process(delta: float) -> void:
 		GrowthStage.MATURE:
 			if not _adult_shown:
 				_show_adult_model()
+			if not _is_spawned_colony:
+				register_spectate_target()
 			growth_complete.emit()
 			_active = false
 
@@ -201,7 +212,8 @@ func _show_adult_model() -> void:
 	var mesh_name: String = _get_species().get("mesh_name", "mushroom_01")
 	var metrics: Dictionary = _get_mature_procedural_metrics()
 	var target_height: float = float(metrics["height"]) * adult_height_scale
-	var ground_lift: float = float(metrics["ground_lift"]) + ground_clearance
+	var on_tree := _substrate_patch != null and _substrate_patch.is_tree_mounted()
+	var ground_lift: float = 0.0 if on_tree else float(metrics["ground_lift"]) + ground_clearance
 	var loaded: Dictionary = MushroomMeshLoader.create_display(
 		mesh_name, target_height, _adult_slot, ground_lift
 	)

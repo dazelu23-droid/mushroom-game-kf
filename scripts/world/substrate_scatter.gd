@@ -15,6 +15,7 @@ const PATCH_DEFINITIONS: Array[Dictionary] = [
 ]
 
 @export var patch_count: int = 14
+@export var tree_trunk_patch_count: int = 14
 @export var scatter_radius: float = 26.0
 @export var min_patch_spacing: float = 7.5
 @export var center_clear_radius: float = 4.0
@@ -45,6 +46,9 @@ func scatter(terrain_height: Callable = Callable()) -> void:
 			continue
 
 		var def: Dictionary = types_pool[placed % types_pool.size()]
+		if def.get("type", "") == "dead_hardwood":
+			def = PATCH_DEFINITIONS[2].duplicate()
+			def["shape"] = "plane"
 		var world_pos := Vector3(pos.x, 0.0, pos.y)
 		if terrain_height.is_valid():
 			world_pos.y = terrain_height.call(pos.x, pos.y)
@@ -58,6 +62,61 @@ func get_substrate_patch_positions() -> Array[Vector3]:
 	for child in get_children():
 		positions.append(child.global_position)
 	return positions
+
+
+func scatter_tree_trunk_patches(trees_root: Node3D) -> void:
+	if trees_root == null:
+		return
+	var trees: Array[Node3D] = []
+	for child in trees_root.get_children():
+		if child is Node3D:
+			trees.append(child as Node3D)
+	if trees.is_empty():
+		return
+	trees.shuffle()
+
+	var placed := 0
+	var tree_idx := 0
+	while placed < tree_trunk_patch_count and tree_idx < trees.size():
+		var tree := trees[tree_idx]
+		tree_idx += 1
+		if _rng.randf() > 0.34:
+			continue
+		_create_tree_trunk_patch(
+			tree,
+			_rng.randf_range(0.2, 0.62),
+			_rng.randf_range(0.0, TAU)
+		)
+		placed += 1
+
+
+func _create_tree_trunk_patch(tree: Node3D, height_ratio: float, angle: float) -> void:
+	var mount: Dictionary = TreeMountUtil.surface_mount(tree, height_ratio, angle)
+	var outward: Vector3 = mount.get("outward", Vector3.UP)
+	var bark_pos: Vector3 = mount.get("position", tree.global_position)
+
+	var root := Node3D.new()
+	root.name = "tree_bark"
+	root.global_position = bark_pos + outward * 0.02
+	add_child(root)
+
+	var area := Area3D.new()
+	area.name = "Area"
+	area.set_script(SUBSTRATE_PATCH_SCRIPT)
+	root.add_child(area)
+
+	var patch := area as SubstratePatch
+	if patch:
+		patch.substrate_type = "tree_bark"
+		patch.substrate_label = "Living tree bark (heartwood)"
+		patch.configure_tree_mount(outward)
+		patch.call_deferred("refresh_tree_marker")
+
+	var col := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.1, 1.1, 0.45)
+	col.shape = box
+	area.add_child(col)
 
 
 func _is_valid_position(pos: Vector2) -> bool:

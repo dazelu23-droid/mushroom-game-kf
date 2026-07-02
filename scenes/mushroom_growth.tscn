@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://dhptwcaiidlr6"]
+
+[ext_resource type="Script" path="res://scripts/visuals/mushroom_growth_visual.gd" id="1_growth"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_knot"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_knot"]
+albedo_color = Color(0.9, 0.88, 0.82, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_prim"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_prim"]
+albedo_color = Color(0.85, 0.82, 0.78, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_stipe"]
+top_radius = 0.08
+bottom_radius = 0.1
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stipe"]
+albedo_color = Color(0.92, 0.9, 0.86, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_cap"]
+radius = 0.5
+height = 0.35
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cap"]
+albedo_color = Color(0.75, 0.55, 0.35, 1)
+
+[node name="MushroomGrowth" type="Node3D"]
+visible = false
+script = ExtResource("1_growth")
+
+[node name="ProceduralRoot" type="Node3D" parent="."]
+
+[node name="HyphalKnot" type="MeshInstance3D" parent="ProceduralRoot"]
+mesh = SubResource("SphereMesh_knot")
+surface_material_override/0 = SubResource("StandardMaterial3D_knot")
+
+[node name="Primordium" type="MeshInstance3D" parent="ProceduralRoot"]
+visible = false
+mesh = SubResource("SphereMesh_prim")
+surface_material_override/0 = SubResource("StandardMaterial3D_prim")
+
+[node name="Pin" type="Node3D" parent="ProceduralRoot"]
+
+[node name="Stipe" type="MeshInstance3D" parent="ProceduralRoot/Pin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+visible = false
+mesh = SubResource("CylinderMesh_stipe")
+surface_material_override/0 = SubResource("StandardMaterial3D_stipe")
+
+[node name="Cap" type="MeshInstance3D" parent="ProceduralRoot/Pin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+visible = false
+mesh = SubResource("SphereMesh_cap")
+surface_material_override/0 = SubResource("StandardMaterial3D_cap")
+
+[node name="AdultSlot" type="Node3D" parent="."]
+visible = false

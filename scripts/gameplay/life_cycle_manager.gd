@@ -49,6 +49,9 @@ func _build_world() -> void:
 	if scatter:
 		if forest:
 			scatter.scatter(forest.get_terrain_height)
+			var trees_root := forest.get_trees_root()
+			if trees_root:
+				scatter.scatter_tree_trunk_patches(trees_root)
 		else:
 			scatter.scatter()
 
@@ -74,7 +77,8 @@ func _start_gameplay() -> void:
 	GameState.set_phase(LifeCycle.Phase.SPORE_DISPERSAL)
 	spore.activate()
 	hud.show_objective(
-		"Drift over the forest with WASD. Ring-marked soil patches are compatible substrates — press Land when overhead."
+		"Drift with WASD. Green rings mark compatible substrates — soil patches on the ground "
+		+ "and bark patches on tree trunks. Press L to land."
 	)
 
 
@@ -145,7 +149,12 @@ func _on_spore_landed(_pos: Vector3, substrate_type: String) -> void:
 		world_camera.follow_distance = 5.5
 		world_camera.set_follow_enabled(true)
 		world_camera.current = true
-	hud.show_objective("Germinating… Watch the spore swell and send out its first hypha.")
+	if GameState.landing_patch and GameState.landing_patch.is_tree_mounted():
+		hud.show_objective(
+			"Germinating on tree bark… Mycelium will grow hidden inside the trunk before fruiting."
+		)
+	else:
+		hud.show_objective("Germinating… Watch the spore swell on the substrate.")
 
 
 func _on_germination_complete() -> void:
@@ -154,7 +163,7 @@ func _on_germination_complete() -> void:
 	if nutrient_scatter:
 		nutrient_scatter.add_cluster_near(GameState.landing_position, 3)
 	refresh_nutrient_sources()
-	mycelium.setup(GameState.landing_position, _nutrient_sources)
+	mycelium.setup(GameState.landing_position, _nutrient_sources, GameState.landing_patch)
 	mycelium.activate()
 	var spore_cam := get_node_or_null("SporeCamera") as OrbitCamera
 	if spore_cam:
@@ -168,10 +177,16 @@ func _on_germination_complete() -> void:
 	hud.bind_mycelium(mycelium)
 	hud.set_grow_ui_visible(true)
 	hud.refresh_colonization_display()
-	hud.show_objective(
-		"Hold SPACE or press Grow Hyphae to extend apical tips toward dead matter. "
-		+ "Species enzymes digest lignin/cellulose — colonize to 80%."
-	)
+	if GameState.landing_patch and GameState.landing_patch.is_tree_mounted():
+		hud.show_objective(
+			"Hold SPACE or press Grow Hyphae to colonize hidden mycelium inside the trunk. "
+			+ "When ready, the fruiting body will emerge from the bark."
+		)
+	else:
+		hud.show_objective(
+			"Hold SPACE or press Grow Hyphae to extend apical tips toward dead matter. "
+			+ "Species enzymes digest lignin/cellulose — colonize to 80%."
+		)
 
 
 func _on_colonization_ready() -> void:
@@ -211,17 +226,22 @@ func _begin_fruiting() -> void:
 	GameState.set_phase(LifeCycle.Phase.PRIMORDIUM_FORMATION)
 	await get_tree().create_timer(1.5).timeout
 	GameState.set_phase(LifeCycle.Phase.FRUITING_BODY_GROWTH)
-	growth.setup(GameState.landing_position)
+	growth.setup(GameState.landing_position, GameState.landing_patch)
 	growth.activate()
-	growth.register_spectate_target()
-	_spectate_enabled = true
+	_spectate_enabled = false
+	_spectator.disable()
 	_spectator.refresh_targets()
-	_spectator.enable()
-	hud.show_objective("Watch bi-phasic growth: primordium → stipe elongation → cap expansion → mature fruiting body. Tab/Q spectate other mushrooms.")
+	hud.show_objective(
+		"Watch your mushroom grow: primordium → stipe → cap → mature fruiting body. "
+		+ "Spectating other mushrooms unlocks when fully grown."
+	)
 
 
 func _on_growth_complete() -> void:
 	GameState.set_phase(LifeCycle.Phase.SPORE_PRODUCTION)
+	_spectate_enabled = true
+	_spectator.refresh_targets()
+	_spectator.enable()
 	_enable_explore_camera()
 	spore_release.activate()
 	_dispersal.register_release_source(Callable(growth, "get_cap_position"), spore_release.release_duration)

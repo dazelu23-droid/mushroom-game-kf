@@ -3,10 +3,12 @@ extends Area3D
 
 @export var substrate_type: String = "leaf_litter"
 @export var substrate_label: String = "Leaf litter"
+@export var mount_type: String = "ground"
 
 var _compatible := false
 var _has_colony := false
 var _marker: MeshInstance3D
+var _mount_outward: Vector3 = Vector3.UP
 
 
 func _ready() -> void:
@@ -19,6 +21,43 @@ func _ready() -> void:
 
 func get_substrate_type() -> String:
 	return substrate_type
+
+
+func is_tree_mounted() -> bool:
+	return mount_type == "tree_trunk"
+
+
+func suppresses_hyphae_visuals() -> bool:
+	return is_tree_mounted()
+
+
+func configure_tree_mount(outward: Vector3, _basis: Basis = Basis.IDENTITY) -> void:
+	mount_type = "tree_trunk"
+	_mount_outward = outward.normalized()
+
+
+func get_mount_outward() -> Vector3:
+	return _mount_outward
+
+
+func get_fruiting_basis(species: Dictionary = {}) -> Basis:
+	if is_tree_mounted():
+		return TreeMountUtil.basis_for_tree_fungus(_mount_outward, species)
+	return Basis.IDENTITY
+
+
+func refresh_tree_marker() -> void:
+	if _marker and is_instance_valid(_marker):
+		_marker.queue_free()
+		_marker = null
+	_build_marker()
+	_update_highlight()
+
+
+func get_landing_position() -> Vector3:
+	if is_tree_mounted():
+		return global_position + _mount_outward * 0.05
+	return global_position + Vector3.UP * 0.08
 
 
 func has_colony() -> bool:
@@ -48,12 +87,15 @@ func set_compatible(compatible: bool) -> void:
 
 func _apply_realistic_material() -> void:
 	var mesh := get_parent().get_node_or_null("Mesh") as MeshInstance3D
-	if mesh == null:
+	if mesh == null or substrate_type == "tree_bark":
 		return
 	var mat := StandardMaterial3D.new()
 	mat.roughness = 0.94
 	mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 	match substrate_type:
+		"tree_bark":
+			mat.albedo_color = Color(0.24, 0.17, 0.11)
+			mat.roughness = 0.96
 		"dead_hardwood":
 			mat.albedo_color = Color(0.28, 0.19, 0.12)
 			mat.roughness = 0.94
@@ -94,12 +136,25 @@ func _build_marker() -> void:
 	_marker.position.y = 0.06
 
 	var ring := TorusMesh.new()
-	ring.inner_radius = 1.35
-	ring.outer_radius = 1.52
+	if is_tree_mounted():
+		ring.inner_radius = 0.42
+		ring.outer_radius = 0.56
+	else:
+		ring.inner_radius = 1.35
+		ring.outer_radius = 1.52
 	ring.rings = 8
 	ring.ring_segments = 24
 	_marker.mesh = ring
-	_marker.rotation.x = PI * 0.5
+	if is_tree_mounted() and _mount_outward.length_squared() > 0.0001:
+		var out := _mount_outward.normalized()
+		var tangent := Vector3.UP.cross(out)
+		if tangent.length_squared() > 0.0001:
+			tangent = tangent.normalized()
+			_marker.basis = Basis(tangent, Vector3.UP, out)
+		else:
+			_marker.rotation = Vector3.ZERO
+	elif not is_tree_mounted():
+		_marker.rotation.x = PI * 0.5
 
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.35, 0.82, 0.42, 0.85)
@@ -116,8 +171,8 @@ func _build_marker() -> void:
 	label_mesh.name = "MarkerCenter"
 	label_mesh.position.y = 0.04
 	var center := CylinderMesh.new()
-	center.top_radius = 0.18
-	center.bottom_radius = 0.18
+	center.top_radius = 0.18 if not is_tree_mounted() else 0.08
+	center.bottom_radius = center.top_radius
 	center.height = 0.02
 	label_mesh.mesh = center
 	var center_mat := mat.duplicate() as StandardMaterial3D

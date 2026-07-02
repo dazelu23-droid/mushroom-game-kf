@@ -139,8 +139,8 @@ func _update_controls_hint(phase: LifeCycle.Phase) -> void:
 			controls_hint.text = "Hold SPACE or toggle Grow button | Tips seek digestible nutrients | 80% to fruit"
 		LifeCycle.Phase.ENVIRONMENTAL_TRIGGER:
 			controls_hint.text = "H raise humidity | V ventilate CO₂ | Need >85% humidity, <40% CO₂"
-		LifeCycle.Phase.FRUITING_BODY_GROWTH:
-			controls_hint.text = "Tab/Q spectate wild mushrooms | Right-click orbit | Scroll zoom"
+		LifeCycle.Phase.FRUITING_BODY_GROWTH, LifeCycle.Phase.PRIMORDIUM_FORMATION:
+			controls_hint.text = "Right-click orbit | Scroll zoom | Focus on your growing mushroom"
 		LifeCycle.Phase.SPORE_PRODUCTION, LifeCycle.Phase.COMPLETE:
 			controls_hint.text = "Tab/Q spectate | Right-drag pan | Shift+right orbit | Scroll zoom | F freecam | Esc exit freecam"
 		_:

@@ -61,6 +61,10 @@ func get_terrain_height(x: float, z: float) -> float:
 	return _terrain_height(x, z)
 
 
+func get_trees_root() -> Node3D:
+	return get_node_or_null("Trees") as Node3D
+
+
 func clear_vegetation_near_points(points: Array[Vector3], radius: float) -> void:
 	for group_name in ["Understory", "Ferns"]:
 		var group := get_node_or_null(group_name) as Node3D

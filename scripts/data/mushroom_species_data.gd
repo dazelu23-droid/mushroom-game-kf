@@ -45,7 +45,7 @@ const SPECIES: Array[Dictionary] = [
 		"common_name": "Reishi / Lingzhi",
 		"scientific_name": "Ganoderma lucidum",
 		"mesh_name": "mushroom_03",
-		"substrates": ["dead_hardwood", "hardwood_sawdust"],
+		"substrates": ["tree_bark", "dead_hardwood", "hardwood_sawdust"],
 		"germination_temp_c": Vector2(12.0, 28.0),
 		"colonization_temp_c": Vector2(24.0, 28.0),
 		"fruiting_temp_c": Vector2(21.0, 30.0),
@@ -62,7 +62,7 @@ const SPECIES: Array[Dictionary] = [
 		"common_name": "Turkey Tail",
 		"scientific_name": "Trametes versicolor",
 		"mesh_name": "mushroom_05",
-		"substrates": ["dead_hardwood", "leaf_litter"],
+		"substrates": ["tree_bark", "dead_hardwood", "leaf_litter"],
 		"germination_temp_c": Vector2(10.0, 24.0),
 		"colonization_temp_c": Vector2(18.0, 26.0),
 		"fruiting_temp_c": Vector2(15.0, 24.0),
@@ -198,7 +198,7 @@ const SPECIES: Array[Dictionary] = [
 		"common_name": "Shiitake",
 		"scientific_name": "Lentinula edodes",
 		"mesh_name": "mushroom_16",
-		"substrates": ["dead_hardwood", "hardwood_sawdust"],
+		"substrates": ["tree_bark", "dead_hardwood", "hardwood_sawdust"],
 		"germination_temp_c": Vector2(10.0, 24.0),
 		"colonization_temp_c": Vector2(21.0, 27.0),
 		"fruiting_temp_c": Vector2(10.0, 24.0),
@@ -232,7 +232,7 @@ const SPECIES: Array[Dictionary] = [
 		"common_name": "King Oyster",
 		"scientific_name": "Pleurotus eryngii",
 		"mesh_name": "mushroom_14",
-		"substrates": ["dead_hardwood", "straw", "leaf_litter"],
+		"substrates": ["tree_bark", "dead_hardwood", "straw", "leaf_litter"],
 		"germination_temp_c": Vector2(10.0, 24.0),
 		"colonization_temp_c": Vector2(20.0, 24.0),
 		"fruiting_temp_c": Vector2(15.0, 21.0),
@@ -325,6 +325,10 @@ static func get_substrates(species: Dictionary) -> Array:
 
 static func has_substrate(species: Dictionary, substrate_type: String) -> bool:
 	return substrate_type in get_substrates(species)
+
+
+static func is_tree_dweller(species: Dictionary) -> bool:
+	return has_substrate(species, "tree_bark")
 
 
 const NUTRIENT_ENZYME_MAP: Dictionary = {

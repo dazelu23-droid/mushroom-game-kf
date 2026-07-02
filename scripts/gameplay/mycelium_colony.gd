@@ -39,6 +39,7 @@ var _species: Dictionary = {}
 var _tip_glow_pool: Array[MeshInstance3D] = []
 var _network_nodes: Array[Vector3] = []
 var _junction_mesh: SphereMesh
+var _embedded_in_tree := false
 
 
 func _ready() -> void:
@@ -51,7 +52,7 @@ func _ready() -> void:
 	_build_materials()
 
 
-func setup(origin: Vector3, nutrients: Array[NutrientSource]) -> void:
+func setup(origin: Vector3, nutrients: Array[NutrientSource], patch: SubstratePatch = null) -> void:
 	for child in _hypha_root.get_children():
 		child.queue_free()
 	for child in _tip_glows.get_children():
@@ -61,17 +62,31 @@ func setup(origin: Vector3, nutrients: Array[NutrientSource]) -> void:
 	_branch_count = 0
 	_network_nodes.clear()
 	_tip_glow_pool.clear()
-	position = origin
 	_nutrient_sources = nutrients
 	_species = GameState.selected_species
+	_embedded_in_tree = patch != null and patch.is_tree_mounted()
+	if _embedded_in_tree:
+		MushroomMount.apply_to_node(self, patch, GameState.selected_species)
+	else:
+		position = origin
 	_rng.randomize()
 	_create_initial_hypha()
+	_apply_embedded_visibility()
+
+
+func _apply_embedded_visibility() -> void:
+	if not _embedded_in_tree:
+		return
+	_hypha_root.visible = false
+	_tip_glows.visible = false
 
 
 func activate() -> void:
 	_active = true
 	_colonization_signaled = false
-	visible = true
+	visible = not _embedded_in_tree
+	if not _embedded_in_tree:
+		_hypha_root.visible = true
 
 
 func deactivate() -> void:
@@ -383,6 +398,8 @@ func _add_hypha_cylinder(
 	top_r: float,
 	dir: Vector3
 ) -> void:
+	if _embedded_in_tree:
+		return
 	var segment_length := start.distance_to(end)
 	if segment_length < 0.004:
 		return
@@ -441,7 +458,7 @@ func _add_hypha_bridge(from: Vector3, to: Vector3, bridge_radius: float) -> void
 
 
 func _add_hypha_junction(at: Vector3, radius: float) -> void:
-	if radius <= 0.0:
+	if _embedded_in_tree or radius <= 0.0:
 		return
 	var mesh_instance := MeshInstance3D.new()
 	var sphere := _junction_mesh.duplicate() as SphereMesh
@@ -454,6 +471,8 @@ func _add_hypha_junction(at: Vector3, radius: float) -> void:
 
 
 func _update_tip_glows(show: bool) -> void:
+	if _embedded_in_tree:
+		return
 	if not show:
 		for glow in _tip_glow_pool:
 			glow.visible = false
